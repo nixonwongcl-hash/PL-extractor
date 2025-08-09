@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Packing List Extractor</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  
+  <style>
+    /* Reset & base */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    body, html {
+      margin: 0;
+      height: 100%;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      background: linear-gradient(135deg, #74ebd5 0%, #9face6 100%);
+      color: #1a202c;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+      overflow-y: auto;
+    }
+    
+    .container {
+      background: white;
+      max-width: 760px;
+      width: 100%;
+      border-radius: 24px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.12);
+      padding: 40px 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2.8rem;
+      font-weight: 700;
+      margin: 0 0 12px;
+      user-select: none;
+      color: #2c5282;
+      text-shadow: 0 2px 6px rgba(44,82,130,0.2);
+    }
+    p.subtitle {
+      font-size: 1.1rem;
+      color: #4a5568;
+      margin: 0 0 36px;
+      max-width: 540px;
+      user-select: none;
+      line-height: 1.5;
+    }
+
+    #topControls {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 36px;
+    }
+
+    input[type="file"] {
+      flex-grow: 1;
+      min-width: 240px;
+      padding: 14px 18px;
+      font-size: 1rem;
+      border: 2px solid #cbd5e0;
+      border-radius: 12px;
+      background: #f7fafc;
+      cursor: pointer;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.03);
+    }
+    input[type="file"]:hover {
+      border-color: #63b3ed;
+    }
+    input[type="file"]:focus {
+      outline: none;
+      border-color: #3182ce;
+      box-shadow: 0 0 10px rgba(49,130,206,0.4);
+      background: #fff;
+    }
+
+    button#printBtn {
+      background-color: #3182ce;
+      border: none;
+      padding: 14px 36px;
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, box-shadow 0.2s ease;
+      user-select: none;
+      min-width: 130px;
+      box-shadow: 0 6px 14px rgba(49,130,206,0.45);
+      flex-shrink: 0;
+    }
+    button#printBtn:disabled {
+      background-color: #a0aec0;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    button#printBtn:not(:disabled):hover {
+      background-color: #2c5282;
+      box-shadow: 0 8px 20px rgba(44,82,130,0.7);
+    }
+
+    #message {
+      font-weight: 600;
+      font-size: 1rem;
+      color: #38a169;
+      min-width: 180px;
+      user-select: none;
+      text-align: center;
+      height: 24px;
+      line-height: 24px;
+      margin-left: 12px;
+      white-space: nowrap;
+    }
+
+    #tablesContainer {
+      width: 100%;
+      max-height: 480px;
+      overflow-y: auto;
+      background: #edf2f7;
+      border-radius: 16px;
+      padding: 24px 32px;
+      box-shadow: inset 0 4px 12px rgba(0,0,0,0.07);
+      scrollbar-width: thin;
+      scrollbar-color: #63b3ed transparent;
+      -webkit-overflow-scrolling: touch;
+    }
+    #tablesContainer::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    #tablesContainer::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #tablesContainer::-webkit-scrollbar-thumb {
+      background-color: #63b3ed;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 36px;
+      page-break-inside: auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    /* Optimized table column widths */
+    thead tr:nth-child(2) th:first-child,
+    tbody td:first-child {
+      width: 40px; /* checkbox column */
+      text-align: center;
+    }
+
+    thead tr:nth-child(2) th:nth-child(2),
+    tbody td:nth-child(2) {
+      white-space: nowrap; /* keep PL on one line */
+      width: 1%; /* auto-fit to content */
+    }
+
+    thead tr:nth-child(2) th:nth-child(3),
+    tbody td:nth-child(3) {
+      width: auto; /* remarks column takes remaining space */
+    }
+
+    thead tr:first-child th {
+      background-color: #bee3f8;
+      font-weight: 700;
+      font-size: 1.1rem;
+      border-bottom: 3px solid #3182ce;
+      color: #2a4365;
+      padding: 18px 24px;
+      user-select: none;
+      text-align: left;
+    }
+
+    thead tr:nth-child(2) th {
+      background-color: #ebf8ff;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border-bottom: 2px solid #90cdf4;
+      color: #2b6cb0;
+      padding: 14px 24px;
+      user-select: none;
+      text-align: left;
+    }
+
+    tbody tr:hover {
+      background-color: #dbeeff;
+      transition: background-color 0.2s ease;
+    }
+
+    tbody td {
+      border-top: 1px solid #e2e8f0;
+      padding: 10px 8px;
+      font-size: 0.9rem;
+      color: #2d3748;
+      vertical-align: middle;
+    }
+
+    tbody input[type="checkbox"] {
+      display: none;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    @media print {
+      tbody input[type="checkbox"] {
+        display: inline-block;
+      }
+      body * {
+        visibility: hidden;
+      }
+      #tablesContainer, #tablesContainer * {
+        visibility: visible;
+      }
+      #tablesContainer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        box-shadow: none;
+        border-radius: 0;
+        padding: 0;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      table {
+        page-break-after: auto;
+        page-break-inside: avoid;
+      }
+      thead {
+        display: table-header-group;
+      }
+      tbody {
+        display: table-row-group;
+      }
+      tbody tr:hover {
+        background-color: transparent !important;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 32px 24px;
+      }
+      h1 {
+        font-size: 2rem;
+      }
+      #topControls {
+        flex-direction: column;
+        gap: 16px;
+      }
+      input[type="file"], button#printBtn {
+        width: 100%;
+        min-width: auto;
+      }
+      #message {
+        margin-left: 0;
+        margin-top: 8px;
+      }
+      #tablesContainer {
+        max-height: 360px;
+        padding: 16px 20px;
+      }
+    }
+
+    footer {
+      margin-top: 48px;
+      font-size: 0.9rem;
+      color: #718096;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" role="main" aria-label="Packing List Extractor tool">
+    <h1>Packing List Extractor</h1>
+    <p class="subtitle">Upload your PDF packing lists and automatically extract the MPL and corresponding PLs for easy review and printing.</p>
+
+    <div id="topControls">
+      <input type="file" id="fileInput" accept="application/pdf" multiple aria-label="Upload one or more PDF files" />
+      <button id="printBtn" disabled aria-disabled="true">Print</button>
+      <div id="message" aria-live="polite" role="status"></div>
+    </div>
+
+    <div id="tablesContainer" tabindex="0" aria-label="Extracted packing lists table container"></div>
+  </div>
+
+  <footer>
+    &copy; 2025 Your Company or Name
+  </footer>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const tablesContainer = document.getElementById('tablesContainer');
+    const printBtn = document.getElementById('printBtn');
+    const message = document.getElementById('message');
+
+    const PL_X_MIN = 700;
+    const PL_X_MAX = 790;
+
+    let mplMap = new Map();
+
+    fileInput.addEventListener('change', async (e) => {
+      const files = e.target.files;
+      if (!files.length) return;
+
+      printBtn.disabled = true;
+      printBtn.setAttribute('aria-disabled', 'true');
+      message.textContent = "Processing...";
+
+      mplMap.clear();
+
+      for (const file of files) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        let fileMPL = null;
+        let filePLs = [];
+
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+
+          textContent.items.forEach(item => {
+            const x = item.transform[4];
+            const text = item.str.trim();
+
+            if (!fileMPL && /MPL\s*[:\-]?\s*(\w+)/i.test(text)) {
+              const match = text.match(/MPL\s*[:\-]?\s*(\w+)/i);
+              if (match) fileMPL = match[1];
+            }
+
+            if (x >= PL_X_MIN && x <= PL_X_MAX && /^P\d+/i.test(text)) {
+              filePLs.push(text);
+            }
+          });
+        }
+
+        if (fileMPL) {
+          if (!mplMap.has(fileMPL)) {
+            mplMap.set(fileMPL, new Set());
+          }
+          filePLs.forEach(pl => mplMap.get(fileMPL).add(pl));
+        }
+      }
+
+      renderTables();
+
+      message.textContent = "Process completed successfully.";
+      printBtn.disabled = false;
+      printBtn.setAttribute('aria-disabled', 'false');
+    });
+
+    function renderTables() {
+      tablesContainer.innerHTML = "";
+
+      mplMap.forEach((plSet, mpl) => {
+        const table = document.createElement("table");
+
+        const thead = document.createElement("thead");
+        const headerRow = document.createElement("tr");
+        const headerCell = document.createElement("th");
+        headerCell.textContent = "MPL: " + mpl;
+        headerCell.colSpan = 3;
+        headerRow.appendChild(headerCell);
+        thead.appendChild(headerRow);
+
+        const columnTitles = document.createElement("tr");
+        const emptyHeader = document.createElement("th");
+        columnTitles.appendChild(emptyHeader);
+
+        const plHeader = document.createElement("th");
+        plHeader.textContent = "PL";
+        columnTitles.appendChild(plHeader);
+
+        const remarkHeader = document.createElement("th");
+        remarkHeader.textContent = "Remarks";
+        columnTitles.appendChild(remarkHeader);
+
+        thead.appendChild(columnTitles);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        const sortedPLs = Array.from(plSet).sort();
+
+        sortedPLs.forEach(pl => {
+          const row = document.createElement("tr");
+
+          const checkboxCell = document.createElement("td");
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkboxCell.appendChild(checkbox);
+
+          const plCell = document.createElement("td");
+          plCell.textContent = pl;
+
+          const remarkCell = document.createElement("td");
+          remarkCell.textContent = "";
+
+          row.appendChild(checkboxCell);
+          row.appendChild(plCell);
+          row.appendChild(remarkCell);
+
+          tbody.appendChild(row);
+        });
+
+        table.appendChild(tbody);
+        tablesContainer.appendChild(table);
+      });
+    }
+
+    printBtn.addEventListener('click', () => {
+      window.print();
+    });
+  </script>
+</body>
+</html>

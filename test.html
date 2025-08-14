@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>PL Code Scanner</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+      margin: 0;
+      padding: 0;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 100vw;
+      padding: 12px;
+    }
+
+    /* Mobile-first cards */
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .card h2 {
+      margin: 0 0 16px 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1a202c;
+    }
+
+    /* Large mobile-friendly buttons */
+    .btn {
+      background: #3182ce;
+      color: #fff;
+      border: 0;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      min-height: 48px;
+      width: 100%;
+      margin-bottom: 8px;
+      transition: background 0.2s;
+    }
+
+    .btn:active {
+      background: #2c5aa0;
+      transform: scale(0.98);
+    }
+
+    .btn:disabled {
+      background: #a0aec0;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: #718096;
+    }
+
+    .btn-secondary:active {
+      background: #4a5568;
+    }
+
+    .btn-danger {
+      background: #e53e3e;
+    }
+
+    .btn-danger:active {
+      background: #c53030;
+    }
+
+    /* Mobile file input */
+    .file-input-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    .file-input-wrapper input[type=file] {
+      position: absolute;
+      left: -9999px;
+    }
+
+    .file-input-label {
+      display: block;
+      padding: 16px;
+      background: #f7fafc;
+      border: 2px dashed #cbd5e0;
+      border-radius: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 500;
+    }
+
+    .file-input-label:active {
+      background: #edf2f7;
+      border-color: #a0aec0;
+    }
+
+    /* Status messages */
+    .status {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      margin: 8px 0;
+      text-align: center;
+    }
+
+    .status.info { background: #ebf8ff; color: #2c5aa0; }
+    .status.success { background: #f0fff4; color: #2f855a; }
+    .status.error { background: #fed7d7; color: #c53030; }
+    .status.warning { background: #fffbeb; color: #d69e2e; }
+
+    /* Video optimized for mobile */
+    .video-container {
+      position: relative;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 12px 0;
+    }
+
+    #video {
+      width: 100%;
+      height: auto;
+      max-height: 50vh;
+      display: block;
+    }
+
+    .video-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border: 2px solid #fff;
+      border-radius: 8px;
+      width: 200px;
+      height: 80px;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    /* Counter optimized for mobile */
+    .counter {
+      display: block;
+      padding: 16px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 18px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .counter.pending {
+      background: #fed7d7;
+      color: #c53030;
+      border: 2px solid #feb2b2;
+    }
+
+    .counter.success {
+      background: #c6f6d5;
+      color: #2f855a;
+      border: 2px solid #9ae6b4;
+    }
+
+    /* Mobile-optimized table */
+    .table-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+    }
+
+    .scroll-indicator {
+      text-align: center;
+      font-size: 12px;
+      color: #718096;
+      padding: 4px;
+      background: #f7fafc;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 400px;
+    }
+
+    thead th {
+      background: #f7fafc;
+      color: #2d3748;
+      padding: 12px 8px;
+      border-bottom: 2px solid #e2e8f0;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      position: sticky;
+      top: 0;
+    }
+
+    tbody td {
+      padding: 14px 8px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 14px;
+    }
+
+    .scanned {
+      background: #f0fff4 !important;
+    }
+
+    .flash-success {
+      background: #c6f6d5 !important;
+      animation: flash 0.5s ease;
+    }
+
+    .flash-warning {
+      background: #fefcbf !important;
+      animation: flash 0.5s ease;
+    }
+
+    .flash-error {
+      background: #fed7d7 !important;
+      animation: flash 0.5s ease;
+    }
+
+    @keyframes flash {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .total-row td {
+      font-weight: 700;
+      background: #f7fafc;
+      border-top: 2px solid #e2e8f0;
+    }
+
+    /* Mobile checkboxes */
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    /* Camera controls */
+    .camera-controls {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .camera-controls button {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    /* Last scan display */
+    .last-scan {
+      background: #f7fafc;
+      padding: 12px;
+      border-radius: 8px;
+      margin: 8px 0;
+      font-family: monospace;
+      font-size: 14px;
+      word-break: break-all;
+      border-left: 4px solid #3182ce;
+    }
+
+    /* Progress indicator */
+    .progress {
+      width: 100%;
+      height: 4px;
+      background: #e2e8f0;
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: #3182ce;
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    /* Responsive adjustments */
+    @media (min-width: 640px) {
+      .container { padding: 20px; }
+      .card { padding: 24px; }
+      
+      .btn-row {
+        display: flex;
+        gap: 12px;
+      }
+      
+      .btn-row .btn {
+        margin-bottom: 0;
+      }
+    }
+
+    /* Hide elements when not needed */
+    .hidden { display: none; }
+    
+    /* Haptic feedback simulation */
+    .haptic {
+      animation: haptic 0.1s ease;
+    }
+
+    /* Tabs styling */
+    .tabs {
+      display: flex;
+      background: #f7fafc;
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .tab {
+      flex: 1;
+      min-width: 100px;
+      padding: 12px 8px;
+      text-align: center;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab.active {
+      background: #3182ce;
+      color: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .tab:not(.active) {
+      color: #4a5568;
+    }
+
+    .tab:not(.active):active {
+      background: #edf2f7;
+    }
+
+    .tab-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      color: inherit;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-left: 4px;
+    }
+
+    .tab:not(.active) .tab-badge {
+      background: #e2e8f0;
+      color: #4a5568;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- File Upload Section -->
+    <div class="card">
+      <h2>📄 Upload Files</h2>
+      
+      <div class="file-input-wrapper">
+        <input id="fileInput" type="file" accept="application/pdf,image/*" multiple />
+        <label for="fileInput" class="file-input-label">
+          <span id="fileLabel">📁 Tap to select PDF or image files</span>
+        </label>
+      </div>
+
+      <button id="extractBtn" class="btn">🔍 Extract PL Codes</button>
+      
+      <div class="progress hidden" id="extractProgress">
+        <div class="progress-bar" id="extractProgressBar"></div>
+      </div>
+      
+      <div id="extractStatus"></div>
+    </div>
+
+    <!-- Scanner Section -->
+    <div class="card">
+      <h2>📱 Camera Scanner</h2>
+      
+      <div class="camera-controls btn-row">
+        <button id="startScanBtn" class="btn" disabled>📷 Start Scanner</button>
+        <button id="switchCameraBtn" class="btn btn-secondary hidden">🔄 Switch</button>
+      </div>
+      
+      <div class="camera-controls btn-row">
+        <button id="stopScanBtn" class="btn btn-danger" disabled>⏹ Stop</button>
+        <button id="clearBtn" class="btn btn-secondary" disabled>🧹 Clear All</button>
+      </div>
+
+      <div class="video-container hidden" id="videoContainer">
+        <video id="video" playsinline muted></video>
+        <div class="video-overlay"></div>
+      </div>
+
+      <div id="scanStatus" class="status info">Scanner ready - upload files first</div>
+      <div id="lastScan" class="last-scan hidden"></div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="card">
+      <div id="counter" class="counter pending">No codes loaded</div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" data-tab="all">
+          📋 All PLs <span class="tab-badge" id="allCount">0</span>
+        </button>
+        <button class="tab" data-tab="unmatched">
+          ❌ Unmatched <span class="tab-badge" id="unmatchedCount">0</span>
+        </button>
+        <button class="tab" data-tab="completed">
+          ✅ Completed <span class="tab-badge" id="completedCount">0</span>
+        </button>
+      </div>
+
+      <div class="table-container">
+        <div class="scroll-indicator">← Swipe to see all columns →</div>
+        <table id="plTable" aria-label="PL codes table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">#</th>
+              <th style="width: 50px; text-align: center;">✓</th>
+              <th style="width: 140px;">PL Code</th>
+              <th>Status / Progress</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="text-align: center; padding: 40px; color: #718096;">Upload files to see PL codes here</td></tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="4" id="totalCell">Total: 0 codes</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="card">
+      <h2>📋 Instructions</h2>
+      <ul>
+        <li><strong>Step 1:</strong> Upload PDF files or images containing PL codes</li>
+        <li><strong>Step 2:</strong> Start the camera scanner</li>
+        <li><strong>Step 3:</strong> Point camera at PL codes to mark them as scanned</li>
+        <li><strong>Tip:</strong> Hold steady and ensure good lighting for best results</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Configuration
+    const PL_CANON = /^P\d{2}[A-Z]{2}\d{7}$/;
+    const PL_FLEX_GLOBAL = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/ig;
+    const PL_FLEX = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/i;
+    const PL_X_MIN = 700;
+    const PL_X_MAX = 790;
+
+    // Elements
+    const fileInput = document.getElementById('fileInput');
+    const fileLabel = document.getElementById('fileLabel');
+    const extractBtn = document.getElementById('extractBtn');
+    const extractStatus = document.getElementById('extractStatus');
+    const extractProgress = document.getElementById('extractProgress');
+    const extractProgressBar = document.getElementById('extractProgressBar');
+
+    const startScanBtn = document.getElementById('startScanBtn');
+    const stopScanBtn = document.getElementById('stopScanBtn');
+    const switchCameraBtn = document.getElementById('switchCameraBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const scanStatus = document.getElementById('scanStatus');
+    const lastScan = document.getElementById('lastScan');
+    const videoEl = document.getElementById('video');
+    const videoContainer = document.getElementById('videoContainer');
+
+    const tableBody = document.querySelector('#plTable tbody');
+    const totalCell = document.getElementById('totalCell');
+    const counterEl = document.getElementById('counter');
+    
+    // Tab elements
+    const tabButtons = document.querySelectorAll('.tab');
+    const allCountEl = document.getElementById('allCount');
+    const unmatchedCountEl = document.getElementById('unmatchedCount');
+    const completedCountEl = document.getElementById('completedCount');
+
+    // State
+    let uniquePLs = [];
+    let plRowMap = new Map();
+    let scannedSet = new Set();
+    let scannedCount = 0;
+    let codeReader = null;
+    let availableCameras = [];
+    let currentCameraIndex = 0;
+    let activeTab = 'all'; // 'all', 'unmatched', 'completed'
+
+    // Utility functions
+    const normalize = s => (s||'').toString().replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+    
+    function showStatus(element, message, type = 'info') {
+      element.className = `status ${type}`;
+      element.textContent = message;
+      element.style.display = 'block';
+    }
+
+    function triggerHaptic(element) {
+      if ('vibrate' in navigator) {
+        navigator.vibrate(50

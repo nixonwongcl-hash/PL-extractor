@@ -466,6 +466,7 @@
         </div>
 
         <div class="video-container hidden" id="videoContainer">
+          <!-- The video element is now the target for QuaggaJS -->
           <video id="video" playsinline muted></video>
           <div class="video-overlay"></div>
         </div>
@@ -588,6 +589,7 @@
       let availableCameras = [];
       let currentCameraIndex = 0;
       let activeTab = "all"; // 'all', 'unmatched', 'completed'
+      let quaggaRunning = false;
 
       // Utility functions
       const normalize = (s) =>
@@ -1005,109 +1007,146 @@
         }
       });
 
-      
-// Camera functionality (QuaggaJS)
-let quaggaRunning = false;
+      // Camera functionality (QuaggaJS)
+      let scannerInitialized = false;
 
-async function initializeCameras() {
-  try {
-    const devices = await Quagga.CameraAccess.enumerateVideoDevices();
-    availableCameras = devices || [];
-    if (availableCameras.length > 1) {
-      switchCameraBtn.classList.remove("hidden");
-    }
-    return availableCameras.length > 0;
-  } catch (error) {
-    console.error("Camera initialization error:", error);
-    return false;
-  }
-}
-
-function startQuaggaWithDevice(device) {
-  const deviceId = device?.deviceId || device?.id || device;
-  return new Promise((resolve, reject) => {
-    Quagga.init({
-      inputStream: {
-        name: "Live",
-        type: "LiveStream",
-        target: videoContainer,
-        constraints: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
-          facingMode: deviceId ? undefined : "environment"
+      // Function to start the scanner
+      async function startScanner() {
+        if (scannerInitialized) {
+            Quagga.start();
+            quaggaRunning = true;
+            return;
         }
-      },
-      decoder: { readers: ["code_128_reader"] },
-      locate: true
-    }, (err) => {
-      if (err) {
-        console.error("Quagga init error:", err);
-        reject(err);
-        return;
+      
+        try {
+            const devices = await Quagga.CameraAccess.enumerateVideoDevices();
+            availableCameras = devices || [];
+            if (availableCameras.length > 1) {
+                switchCameraBtn.classList.remove("hidden");
+            }
+
+            // Find the back camera, or default to the first one
+            const backCamera = availableCameras.find(
+                (d) => /back|rear|environment/i.test(d.label)
+            );
+            const deviceId = backCamera ? backCamera.deviceId : availableCameras[0]?.deviceId;
+            
+            // QuaggaJS initialization
+            Quagga.init(
+                {
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: videoEl, // Pass the video element directly as the target
+                        constraints: {
+                            deviceId: deviceId ? { exact: deviceId } : undefined,
+                            facingMode: deviceId ? undefined : "environment",
+                        },
+                    },
+                    decoder: {
+                        readers: ["code_128_reader"],
+                    },
+                    locate: true, // Show the detection box
+                },
+                (err) => {
+                    if (err) {
+                        console.error("Quagga init error:", err);
+                        showStatus(scanStatus, `❌ Camera error: ${err.message}`, "error");
+                        quaggaRunning = false;
+                        return;
+                    }
+                    
+                    // Start Quagga after successful initialization
+                    Quagga.start();
+                    quaggaRunning = true;
+                    scannerInitialized = true;
+                    
+                    // Handle detected codes
+                    Quagga.onDetected((data) => {
+                        const code = data?.codeResult?.code;
+                        if (code) {
+                            onScanMatch(code);
+                        }
+                    });
+
+                    // Set UI state
+                    videoContainer.classList.remove("hidden");
+                    startScanBtn.disabled = true;
+                    stopScanBtn.disabled = false;
+                    showStatus(scanStatus, "📷 Scanning... Point at PL codes", "success");
+                }
+            );
+        } catch (error) {
+            console.error("Camera initialization error:", error);
+            showStatus(scanStatus, `❌ No camera found or access denied`, "error");
+            startScanBtn.disabled = false;
+        }
       }
-      Quagga.start();
-      quaggaRunning = true;
-      Quagga.onDetected((data) => {
-        const code = data?.codeResult?.code;
-        if (code) onScanMatch(code);
+
+      // Function to stop the scanner
+      function stopScanner() {
+        if (quaggaRunning) {
+          Quagga.stop();
+          quaggaRunning = false;
+        }
+        videoContainer.classList.add("hidden");
+        startScanBtn.disabled = uniquePLs.length === 0;
+        stopScanBtn.disabled = true;
+        switchCameraBtn.classList.add("hidden");
+        showStatus(scanStatus, "⏸ Scanner stopped", "info");
+      }
+
+      // Event listeners for scanner buttons
+      startScanBtn.addEventListener("click", startScanner);
+      stopScanBtn.addEventListener("click", stopScanner);
+
+      switchCameraBtn.addEventListener("click", async () => {
+          if (availableCameras.length <= 1 || !quaggaRunning) {
+              return;
+          }
+          
+          Quagga.stop();
+          quaggaRunning = false;
+          
+          currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+          const newCamera = availableCameras[currentCameraIndex];
+          
+          // Re-initialize Quagga with the new camera
+          Quagga.init({
+              inputStream: {
+                  name: "Live",
+                  type: "LiveStream",
+                  target: videoEl,
+                  constraints: {
+                      deviceId: { exact: newCamera.deviceId },
+                      facingMode: /back|rear|environment/i.test(newCamera.label)
+                          ? "environment"
+                          : "user",
+                  },
+              },
+              decoder: { readers: ["code_128_reader"] },
+              locate: true,
+          }, (err) => {
+              if (err) {
+                  console.error("Quagga init error on switch:", err);
+                  showStatus(scanStatus, `❌ Error switching camera`, "error");
+                  return;
+              }
+              Quagga.start();
+              quaggaRunning = true;
+              const cameraType = /back|rear|environment/i.test(newCamera.label) ? "📷 Back" : "🤳 Front";
+              showStatus(scanStatus, `${cameraType} camera active`, "success");
+          });
       });
-      resolve(true);
-    });
-  });
-}
 
-startScanBtn.addEventListener("click", async () => {
-  const hasCamera = await initializeCameras();
-  if (!hasCamera) {
-    showStatus(scanStatus, "❌ No camera found", "error");
-    return;
-  }
-  const backCamera =
-    availableCameras.find((d) => /back|rear|environment/i.test(d.label)) ||
-    availableCameras[currentCameraIndex] ||
-    availableCameras[0];
-  await startQuaggaWithDevice(backCamera);
-  videoContainer.classList.remove("hidden");
-  videoEl.classList.add("hidden");
-  startScanBtn.disabled = true;
-  stopScanBtn.disabled = false;
-  showStatus(scanStatus, "📷 Scanning... Point at PL codes", "success");
-});
+      window.addEventListener("beforeunload", () => {
+        if (quaggaRunning) {
+          Quagga.stop();
+          quaggaRunning = false;
+        }
+      });
 
-stopScanBtn.addEventListener("click", () => {
-  if (quaggaRunning) {
-    Quagga.stop();
-    quaggaRunning = false;
-  }
-  videoContainer.classList.add("hidden");
-  startScanBtn.disabled = uniquePLs.length === 0;
-  stopScanBtn.disabled = true;
-  switchCameraBtn.classList.add("hidden");
-  showStatus(scanStatus, "⏸ Scanner stopped", "info");
-});
-
-switchCameraBtn.addEventListener("click", async () => {
-  if (availableCameras.length <= 1) return;
-  currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-  const camera = availableCameras[currentCameraIndex];
-  if (quaggaRunning) {
-    Quagga.stop();
-    quaggaRunning = false;
-  }
-  await startQuaggaWithDevice(camera);
-  const cameraType = /back|rear|environment/i.test(camera.label)
-    ? "📷 Back"
-    : "🤳 Front";
-  showStatus(scanStatus, `${cameraType} camera active`, "success");
-});
-
-window.addEventListener("beforeunload", () => {
-  if (quaggaRunning) {
-    Quagga.stop();
-    quaggaRunning = false;
-  }
-});
-
-clearBtn.addEventListener("click", () => {
+      clearBtn.addEventListener("click", () => {
         scannedSet.clear();
         scannedCount = 0;
 
@@ -1126,9 +1165,9 @@ clearBtn.addEventListener("click", () => {
       });
 
       // Cleanup on page unload
-      window.addEventListener("beforeunload", async () => {
-        if (codeReader) {
-          await codeReader.reset();
+      window.addEventListener("beforeunload", () => {
+        if (quaggaRunning) {
+          Quagga.stop();
         }
       });
 

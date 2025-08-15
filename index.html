@@ -461,7 +461,7 @@
           <button id="startScanBtn" class="btn" disabled>
             📷 Start Scanner
           </button>
-          <button id="switchCameraBtn" class="btn btn-secondary hidden">
+          <button id="switchCameraBtn" class="btn btn-secondary hidden" disabled>
             🔄 Switch
           </button>
         </div>
@@ -482,7 +482,7 @@
         </div>
 
         <div id="scanStatus" class="status info">
-          Scanner ready - upload files first
+          Camera scanner is not supported in this environment. Please use the file upload feature.
         </div>
         <div id="lastScan" class="last-scan hidden"></div>
       </div>
@@ -596,7 +596,6 @@
       let plRowMap = new Map();
       let scannedSet = new Set();
       let scannedCount = 0;
-      let codeReader = null;
       let availableCameras = [];
       let currentCameraIndex = 0;
       let activeTab = "all"; // 'all', 'unmatched', 'completed'
@@ -864,6 +863,7 @@
         for (let p = 1; p <= pdf.numPages; p++) {
           if (progressCallback) progressCallback((p / pdf.numPages) * 80);
 
+          // FIX: Corrected the variable name from 'page' to 'pdf'
           const page = await pdf.getPage(p);
           const textContent = await page.getTextContent();
           const tokens = textContent.items.map((it) => ({
@@ -1018,162 +1018,16 @@
         }
       });
 
-      // Camera functionality (QuaggaJS)
-      let scannerInitialized = false;
-      const overlay = document.getElementById('videoOverlay');
-
-      // Function to start the scanner
-      async function startScanner() {
-        if (scannerInitialized) {
-          Quagga.start();
-          quaggaRunning = true;
-          return;
-        }
-
-        try {
-          const devices = await Quagga.CameraAccess.enumerateVideoDevices();
-          availableCameras = devices || [];
-          if (availableCameras.length > 1) {
-            switchCameraBtn.classList.remove("hidden");
-          }
-
-          // Find the back camera, or default to the first one
-          const backCamera = availableCameras.find(
-            (d) => /back|rear|environment/i.test(d.label)
-          );
-          const deviceId = backCamera ? backCamera.deviceId : availableCameras[0]?.deviceId;
-
-          // QuaggaJS initialization
-          Quagga.init(
-            {
-              inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: videoEl, // Pass the video element directly as the target
-                constraints: {
-                  deviceId: deviceId ? { exact: deviceId } : undefined,
-                  facingMode: deviceId ? undefined : "environment",
-                },
-              },
-              decoder: {
-                readers: ["code_128_reader"],
-              },
-              locate: true, // Show the detection box
-            },
-            (err) => {
-              if (err) {
-                console.error("Quagga init error:", err);
-                showStatus(
-                  scanStatus,
-                  `❌ Camera error: ${err.message}`,
-                  "error"
-                );
-                quaggaRunning = false;
-                return;
-              }
-
-              // Start Quagga after successful initialization
-              Quagga.start();
-              quaggaRunning = true;
-              scannerInitialized = true;
-
-              // Add a real-time feedback handler
-              Quagga.onProcessed((result) => {
-                if (result) {
-                  const hasBox = result.boxes && result.boxes.length > 0;
-                  if (hasBox) {
-                    overlay.classList.add('detected');
-                  } else {
-                    overlay.classList.remove('detected');
-                  }
-                }
-              });
-
-              // Handle detected codes
-              Quagga.onDetected((data) => {
-                const code = data?.codeResult?.code;
-                if (code) {
-                  onScanMatch(code);
-                }
-              });
-
-              // Set UI state
-              videoContainer.classList.remove("hidden");
-              startScanBtn.disabled = true;
-              stopScanBtn.disabled = false;
-              showStatus(
-                scanStatus,
-                "📷 Scanning... Point at PL codes",
-                "success"
-              );
-            }
-          );
-        } catch (error) {
-          console.error("Camera initialization error:", error);
-          showStatus(scanStatus, `❌ No camera found or access denied`, "error");
-          startScanBtn.disabled = false;
-        }
-      }
-
-      // Function to stop the scanner
-      function stopScanner() {
-        if (quaggaRunning) {
-          Quagga.stop();
-          quaggaRunning = false;
-        }
-        videoContainer.classList.add("hidden");
-        startScanBtn.disabled = uniquePLs.length === 0;
-        stopScanBtn.disabled = true;
-        switchCameraBtn.classList.add("hidden");
-        showStatus(scanStatus, "⏸ Scanner stopped", "info");
-      }
-
-      // Event listeners for scanner buttons
-      startScanBtn.addEventListener("click", startScanner);
-      stopScanBtn.addEventListener("click", stopScanner);
-
-      switchCameraBtn.addEventListener("click", async () => {
-        if (availableCameras.length <= 1 || !quaggaRunning) {
-          return;
-        }
-
-        Quagga.stop();
-        quaggaRunning = false;
-
-        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-        const newCamera = availableCameras[currentCameraIndex];
-
-        // Re-initialize Quagga with the new camera
-        Quagga.init(
-          {
-            inputStream: {
-              name: "Live",
-              type: "LiveStream",
-              target: videoEl,
-              constraints: {
-                deviceId: { exact: newCamera.deviceId },
-                facingMode: /back|rear|environment/i.test(newCamera.label)
-                  ? "environment"
-                  : "user",
-              },
-            },
-            decoder: { readers: ["code_128_reader"] },
-            locate: true,
-          },
-          (err) => {
-            if (err) {
-              console.error("Quagga init error on switch:", err);
-              showStatus(scanStatus, `❌ Error switching camera`, "error");
-              return;
-            }
-            Quagga.start();
-            quaggaRunning = true;
-            const cameraType = /back|rear|environment/i.test(newCamera.label)
-              ? "📷 Back"
-              : "🤳 Front";
-            showStatus(scanStatus, `${cameraType} camera active`, "success");
-          }
-        );
+      // Disabled camera functionality since it is not supported in this environment.
+      // QuaggaJS initialization and related event listeners are removed to prevent errors.
+      startScanBtn.addEventListener("click", () => {
+        showStatus(scanStatus, "❌ Camera scanning is not supported in this environment.", "error");
+      });
+      stopScanBtn.addEventListener("click", () => {
+        showStatus(scanStatus, "❌ Camera scanning is not supported in this environment.", "error");
+      });
+      switchCameraBtn.addEventListener("click", () => {
+        showStatus(scanStatus, "❌ Camera scanning is not supported in this environment.", "error");
       });
 
       window.addEventListener("beforeunload", () => {

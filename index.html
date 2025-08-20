@@ -1,1171 +1,919 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
-    />
-    <title>PL Code Scanner</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>PL Code Scanner</title>
 
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
-    <script src="https://unpkg.com/@ericblade/quagga2@1.2.6/dist/quagga.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" onerror="console.warn('PDF.js failed to load')"></script>
+  <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js" onerror="console.warn('Tesseract.js failed to load')"></script>
 
-    <style>
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family: Inter, system-ui, -apple-system, sans-serif;
-        background: #f8fafc;
-        margin: 0;
-        padding: 0;
-        line-height: 1.5;
-      }
-
-      .container {
-        max-width: 100vw;
-        padding: 12px;
-      }
-
-      /* Mobile-first cards */
-      .card {
-        background: #fff;
-        border-radius: 16px;
-        padding: 16px;
-        margin-bottom: 16px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      }
-
-      .card h2 {
-        margin: 0 0 16px 0;
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #1a202c;
-      }
-
-      /* Large mobile-friendly buttons */
-      .btn {
-        background: #3182ce;
-        color: #fff;
-        border: 0;
-        padding: 14px 20px;
-        border-radius: 12px;
-        font-weight: 600;
-        font-size: 16px;
-        cursor: pointer;
-        min-height: 48px;
-        width: 100%;
-        margin-bottom: 8px;
-        transition: background 0.2s;
-      }
-
-      .btn:active {
-        background: #2c5aa0;
-        transform: scale(0.98);
-      }
-
-      .btn:disabled {
-        background: #a0aec0;
-        cursor: not-allowed;
-        transform: none;
-      }
-
-      .btn-secondary {
-        background: #718096;
-      }
-
-      .btn-secondary:active {
-        background: #4a5568;
-      }
-
-      .btn-danger {
-        background: #e53e3e;
-      }
-
-      .btn-danger:active {
-        background: #c53030;
-      }
-
-      /* Mobile file input */
-      .file-input-wrapper {
-        position: relative;
-        overflow: hidden;
-        display: block;
-        margin-bottom: 12px;
-      }
-
-      .file-input-wrapper input[type="file"] {
-        position: absolute;
-        left: -9999px;
-      }
-
-      .file-input-label {
-        display: block;
-        padding: 16px;
-        background: #f7fafc;
-        border: 2px dashed #cbd5e0;
-        border-radius: 12px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        min-height: 60px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 500;
-      }
-
-      .file-input-label:active {
-        background: #edf2f7;
-        border-color: #a0aec0;
-      }
-
-      /* Status messages */
-      .status {
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-weight: 500;
-        margin: 8px 0;
-        text-align: center;
-      }
-
-      .status.info {
-        background: #ebf8ff;
-        color: #2c5aa0;
-      }
-      .status.success {
-        background: #f0fff4;
-        color: #2f855a;
-      }
-      .status.error {
-        background: #fed7d7;
-        color: #c53030;
-      }
-      .status.warning {
-        background: #fffbeb;
-        color: #d69e2e;
-      }
-
-      /* Video optimized for mobile */
-      /* Make scanner full screen inside the card */
-.video-container {
-  position: relative;
-  background: #000;
-  border-radius: 12px;
-  overflow: hidden;
-  margin: 12px 0;
-  width: 100%;
-  height: 70vh; /* fill most of the viewport height */
-}
-
-#video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover; /* fill and crop without distortion */
-  display: block;
-}
-
-.video-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  border: 2px solid #fff;
-  border-radius: 8px;
-  width: 60%;
-  height: 30%;
-  pointer-events: none;
-  opacity: 0.7;
-}
-
-      /* Counter optimized for mobile */
-      .counter {
-        display: block;
-        padding: 16px;
-        border-radius: 12px;
-        font-weight: 700;
-        font-size: 18px;
-        text-align: center;
-        margin-bottom: 16px;
-      }
-
-      .counter.pending {
-        background: #fed7d7;
-        color: #c53030;
-        border: 2px solid #feb2b2;
-      }
-
-      .counter.success {
-        background: #c6f6d5;
-        color: #2f855a;
-        border: 2px solid #9ae6b4;
-      }
-
-      /* Mobile-optimized table */
-      .table-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        background: #fff;
-      }
-
-      .scroll-indicator {
-        text-align: center;
-        font-size: 12px;
-        color: #718096;
-        padding: 4px;
-        background: #f7fafc;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 400px;
-      }
-
-      thead th {
-        background: #f7fafc;
-        color: #2d3748;
-        padding: 12px 8px;
-        border-bottom: 2px solid #e2e8f0;
-        text-align: left;
-        font-weight: 600;
-        font-size: 14px;
-        position: sticky;
-        top: 0;
-      }
-
-      tbody td {
-        padding: 14px 8px;
-        border-bottom: 1px solid #f1f5f9;
-        font-size: 14px;
-      }
-
-      .scanned {
-        background: #f0fff4 !important;
-      }
-
-      .flash-success {
-        background: #c6f6d5 !important;
-        animation: flash 0.5s ease;
-      }
-
-      .flash-warning {
-        background: #fefcbf !important;
-        animation: flash 0.5s ease;
-      }
-
-      .flash-error {
-        background: #fed7d7 !important;
-        animation: flash 0.5s ease;
-      }
-
-      @keyframes flash {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.7;
-        }
-      }
-
-      .total-row td {
-        font-weight: 700;
-        background: #f7fafc;
-        border-top: 2px solid #e2e8f0;
-      }
-
-      /* Mobile checkboxes */
-      input[type="checkbox"] {
-        width: 20px;
-        height: 20px;
-        cursor: pointer;
-      }
-
-      /* Camera controls */
-      .camera-controls {
-        display: flex;
-        gap: 8px;
-        margin: 12px 0;
-      }
-
-      .camera-controls button {
-        flex: 1;
-        margin-bottom: 0;
-      }
-
-      /* Last scan display */
-      .last-scan {
-        background: #f7fafc;
-        padding: 12px;
-        border-radius: 8px;
-        margin: 8px 0;
-        font-family: monospace;
-        font-size: 14px;
-        word-break: break-all;
-        border-left: 4px solid #3182ce;
-      }
-
-      /* Progress indicator */
-      .progress {
-        width: 100%;
-        height: 4px;
-        background: #e2e8f0;
-        border-radius: 2px;
-        overflow: hidden;
-        margin: 8px 0;
-      }
-
-      .progress-bar {
-        height: 100%;
-        background: #3182ce;
-        border-radius: 2px;
-        transition: width 0.3s ease;
-        width: 0%;
-      }
-
-      /* Responsive adjustments */
-      @media (min-width: 640px) {
-        .container {
-          padding: 20px;
-        }
-        .card {
-          padding: 24px;
-        }
-
-        .btn-row {
-          display: flex;
-          gap: 12px;
-        }
-
-        .btn-row .btn {
-          margin-bottom: 0;
-        }
-      }
-
-      /* Hide elements when not needed */
-      .hidden {
-        display: none;
-      }
-
-      /* Haptic feedback simulation */
-      .haptic {
-        animation: haptic 0.1s ease;
-      }
-
-      /* Tabs styling */
-      .tabs {
-        display: flex;
-        background: #f7fafc;
-        border-radius: 12px;
-        padding: 4px;
-        margin-bottom: 16px;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-
-      .tab {
-        flex: 1;
-        min-width: 100px;
-        padding: 12px 8px;
-        text-align: center;
-        background: transparent;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.2s;
-        white-space: nowrap;
-      }
-
-      .tab.active {
-        background: #3182ce;
-        color: #fff;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-
-      .tab:not(.active) {
-        color: #4a5568;
-      }
-
-      .tab:not(.active):active {
-        background: #edf2f7;
-      }
-
-      .tab-badge {
-        display: inline-block;
-        background: rgba(255, 255, 255, 0.2);
-        color: inherit;
-        padding: 2px 6px;
-        border-radius: 10px;
-        font-size: 12px;
-        font-weight: 700;
-        margin-left: 4px;
-      }
-
-      .tab:not(.active) .tab-badge {
-        background: #e2e8f0;
-        color: #4a5568;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <!-- File Upload Section -->
-      <div class="card">
-        <h2>📄 Upload Files</h2>
-
-        <div class="file-input-wrapper">
-          <input
-            id="fileInput"
-            type="file"
-            accept="application/pdf,image/*"
-            multiple
-          />
-          <label for="fileInput" class="file-input-label">
-            <span id="fileLabel">📁 Tap to select PDF or image files</span>
-          </label>
-        </div>
-
-        <button id="extractBtn" class="btn">🔍 Extract PL Codes</button>
-
-        <div class="progress hidden" id="extractProgress">
-          <div class="progress-bar" id="extractProgressBar"></div>
-        </div>
-
-        <div id="extractStatus"></div>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Inter, system-ui, -apple-system, sans-serif; background:#f8fafc; margin:0; padding:0; }
+    .container { max-width:100vw; padding:12px; }
+    .card { background:#fff; border-radius:16px; padding:16px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    .card h2 { margin:0 0 16px 0; font-size:1.25rem; font-weight:600; color:#1a202c; }
+    .btn { background:#3182ce; color:#fff; border:0; padding:14px 20px; border-radius:12px; font-weight:600; font-size:16px; cursor:pointer; min-height:48px; width:100%; margin-bottom:8px; transition: all 0.2s ease; }
+    .btn:hover:not(:disabled) { background:#2c5282; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3); }
+    .btn:active:not(:disabled) { transform: scale(0.98); }
+    .btn:disabled { background:#a0aec0; cursor:not-allowed; transform:none; }
+    .btn-secondary { background:#718096; }
+    .btn-secondary:hover:not(:disabled) { background:#4a5568; }
+    .btn-danger { background:#e53e3e; }
+    .btn-danger:hover:not(:disabled) { background:#c53030; }
+    .status { padding:12px 16px; border-radius:8px; font-weight:500; margin:8px 0; text-align:center; transition: all 0.3s ease; }
+    .status.info { background:#ebf8ff; color:#2c5aa0; border-left:4px solid #3182ce; }
+    .status.success { background:#f0fff4; color:#2f855a; border-left:4px solid #38a169; }
+    .status.error { background:#fed7d7; color:#c53030; border-left:4px solid #e53e3e; }
+    .status.warning { background:#fef5e7; color:#d69e2e; border-left:4px solid #d69e2e; }
+    .last-scan { background:#f7fafc; padding:12px; border-radius:8px; margin:8px 0; font-family:monospace; font-size:14px; border-left:4px solid #3182ce; animation: fadeIn 0.3s ease; }
+    .table-container { overflow-x:auto; border-radius:8px; border:1px solid #e2e8f0; background:#fff; max-height:400px; overflow-y:auto; }
+    table { width:100%; border-collapse:collapse; min-width:400px; }
+    thead th { background:#f7fafc; padding:12px 8px; border-bottom:2px solid #e2e8f0; text-align:left; font-weight:600; font-size:14px; position:sticky; top:0; z-index:10; }
+    tbody td { padding:14px 8px; border-bottom:1px solid #f1f5f9; font-size:14px; }
+    .scanned { background:#f0fff4 !important; animation: highlightScan 0.5s ease; }
+    .counter { display:block; padding:16px; border-radius:12px; font-weight:700; font-size:18px; text-align:center; margin-bottom:16px; transition: all 0.3s ease; }
+    .counter.pending { background:#fed7d7; color:#c53030; }
+    .counter.success { background:#c6f6d5; color:#2f855a; }
+    .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+    .modal.hidden { display: none; }
+    .modal-content { max-width: 400px; width: 90%; text-align: center; animation: modalSlide 0.3s ease; }
+    .modal-content h2 { font-size: 1.25rem; margin-bottom: 12px; color: #c53030; }
+    .file-input { width:100%; padding:12px; margin-bottom:12px; border:2px dashed #cbd5e0; border-radius:8px; text-align:center; cursor:pointer; transition: all 0.2s ease; }
+    .file-input:hover { border-color:#3182ce; background:#f7fafc; }
+    .file-input.drag-over { border-color:#38a169; background:#f0fff4; }
+    .progress-bar { width:100%; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; margin:8px 0; }
+    .progress-fill { height:100%; background:#3182ce; transition: width 0.3s ease; }
+    .search-box { width:100%; padding:12px; font-size:16px; border-radius:8px; border:1px solid #cbd5e0; margin-bottom:12px; }
+    .search-box:focus { outline:none; border-color:#3182ce; box-shadow:0 0 0 3px rgba(49, 130, 206, 0.1); }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes highlightScan { 0% { background:#c6f6d5 !important; transform: scale(1.02); } 100% { background:#f0fff4 !important; transform: scale(1); } }
+    @keyframes modalSlide { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    
+    @media (max-width: 768px) {
+      .container { padding: 8px; }
+      .card { padding: 12px; margin-bottom: 12px; }
+      .btn { padding: 12px 16px; font-size: 15px; }
+      thead th, tbody td { padding: 10px 6px; font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- File Upload -->
+    <div class="card">
+      <h2>📄 Upload Files</h2>
+      <div class="file-input" id="fileDropZone">
+        <input id="fileInput" type="file" accept="application/pdf,image/*" multiple style="display:none;" />
+        📁 Click to select files or drag & drop here
+        <br><small>Supports PDF and images (PNG, JPG, etc.)</small>
       </div>
-
-      <!-- Scanner Section -->
-      <div class="card">
-        <h2>📱 Camera Scanner</h2>
-
-        <div class="camera-controls btn-row">
-          <button id="startScanBtn" class="btn" disabled>
-            📷 Start Scanner
-          </button>
-          <button id="switchCameraBtn" class="btn btn-secondary hidden">
-            🔄 Switch
-          </button>
-        </div>
-
-        <div class="camera-controls btn-row">
-          <button id="stopScanBtn" class="btn btn-danger" disabled>
-            ⏹ Stop
-          </button>
-          <button id="clearBtn" class="btn btn-secondary" disabled>
-            🧹 Clear All
-          </button>
-        </div>
-
-        <div class="video-container hidden" id="videoContainer">
-          <video id="video" playsinline muted></video>
-          <div class="video-overlay"></div>
-        </div>
-
-        <div id="scanStatus" class="status info">
-          Scanner ready - upload files first
-        </div>
-        <div id="lastScan" class="last-scan hidden"></div>
+      <button id="extractBtn" class="btn">🔍 Extract PL Codes</button>
+      <div class="progress-bar hidden" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
       </div>
+      <div id="extractStatus"></div>
+    </div>
 
-      <!-- Results Section -->
-      <div class="card">
-        <div id="counter" class="counter pending">No codes loaded</div>
+    <!-- Breakdown Summary -->
+    <div id="summaryBreakdown" class="card" style="text-align:center; font-weight:600; font-size:16px; padding:12px; color:#2d3748;">
+      No data loaded
+    </div>
 
-        <!-- Tabs -->
-        <div class="tabs">
-          <button class="tab active" data-tab="all">
-            📋 All PLs <span class="tab-badge" id="allCount">0</span>
-          </button>
-          <button class="tab" data-tab="unmatched">
-            ❌ Unmatched <span class="tab-badge" id="unmatchedCount">0</span>
-          </button>
-          <button class="tab" data-tab="completed">
-            ✅ Completed <span class="tab-badge" id="completedCount">0</span>
-          </button>
-        </div>
-
-        <div class="table-container">
-          <div class="scroll-indicator">← Swipe to see all columns →</div>
-          <table id="plTable" aria-label="PL codes table">
-            <thead>
-              <tr>
-                <th style="width: 50px">#</th>
-                <th style="width: 50px; text-align: center">✓</th>
-                <th style="width: 140px">PL Code</th>
-                <th>Status / Progress</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td
-                  colspan="4"
-                  style="text-align: center; padding: 40px; color: #718096"
-                >
-                  Upload files to see PL codes here
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr class="total-row">
-                <td colspan="4" id="totalCell">Total: 0 codes</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+    <!-- Scanner -->
+    <div class="card">
+      <h2>📱 Barcode Scanner</h2>
+      <input id="barcodeInput" class="search-box" type="text" placeholder="Scan barcode here..." autofocus />
+      <div style="display:flex; gap:12px; margin-bottom:12px;">
+        <button id="clearBtn" class="btn btn-secondary" disabled>🧹 Clear All</button>
+        <button id="manualBtn" class="btn btn-secondary">✍️ Manual Entry</button>
       </div>
+      <div id="scanStatus" class="status info">Scanner ready - upload files first</div>
+      <div id="lastScan" class="last-scan hidden"></div>
+    </div>
 
-      <!-- Instructions -->
-      <div class="card">
-        <h2>📋 Instructions</h2>
-        <ul>
-          <li>
-            <strong>Step 1:</strong> Upload PDF files or images containing PL
-            codes
-          </li>
-          <li><strong>Step 2:</strong> Start the camera scanner</li>
-          <li>
-            <strong>Step 3:</strong> Point camera at PL codes to mark them as
-            scanned
-          </li>
-          <li>
-            <strong>Tip:</strong> Hold steady and ensure good lighting for best
-            results
-          </li>
-        </ul>
+    <!-- Search and Filter -->
+    <div class="card">
+      <input id="searchInput" class="search-box" type="text" placeholder="🔍 Search PL codes..." />
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button id="filterAll" class="btn btn-secondary" style="width:auto; padding:8px 16px;">All</button>
+        <button id="filterScanned" class="btn btn-secondary" style="width:auto; padding:8px 16px;">✅ Scanned</button>
+        <button id="filterPending" class="btn btn-secondary" style="width:auto; padding:8px 16px;">❌ Pending</button>
       </div>
     </div>
 
-    <script>
-      // Configuration
-      const PL_CANON = /^P\d{2}[A-Z]{2}\d{7}$/;
-      const PL_FLEX_GLOBAL = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/gi;
-      const PL_FLEX = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/i;
-      const PL_X_MIN = 700;
-      const PL_X_MAX = 790;
+    <!-- Extracted Results -->
+    <div class="card">
+      <div id="counter" class="counter pending">No codes loaded</div>
+      <div class="table-container">
+        <table id="plTable">
+          <thead><tr><th>#</th><th>✓</th><th>PL Code</th><th>Status</th></tr></thead>
+          <tbody><tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">Upload files to see PL codes here</td></tr></tbody>
+          <tfoot><tr><td colspan="4" id="totalCell">Total: 0 codes</td></tr></tfoot>
+        </table>
+      </div>
+      <div style="margin-top:16px;">
+        <button id="downloadBtn" class="btn">⬇️ Download Summary</button>
+      </div>
+    </div>
 
-      // Elements
-      const fileInput = document.getElementById("fileInput");
-      const fileLabel = document.getElementById("fileLabel");
-      const extractBtn = document.getElementById("extractBtn");
-      const extractStatus = document.getElementById("extractStatus");
-      const extractProgress = document.getElementById("extractProgress");
-      const extractProgressBar = document.getElementById("extractProgressBar");
+    <!-- Unmatched Entries -->
+    <div class="card">
+      <h2>⚠️ Unmatched Entries</h2>
+      <div class="table-container">
+        <table id="unmatchedTable">
+          <thead><tr><th>#</th><th>Code</th><th>Source</th><th>Timestamp</th></tr></thead>
+          <tbody><tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">No unmatched codes</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-      const startScanBtn = document.getElementById("startScanBtn");
-      const stopScanBtn = document.getElementById("stopScanBtn");
-      const switchCameraBtn = document.getElementById("switchCameraBtn");
-      const clearBtn = document.getElementById("clearBtn");
-      const scanStatus = document.getElementById("scanStatus");
-      const lastScan = document.getElementById("lastScan");
-      const videoEl = document.getElementById("video");
-      const videoContainer = document.getElementById("videoContainer");
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="modal hidden">
+    <div class="modal-content card">
+      <h2>⚠ Confirm Action</h2>
+      <p>Are you sure you want to clear all scanned marks?</p>
+      <div style="display:flex; gap:12px; margin-top:16px;">
+        <button id="confirmYes" class="btn btn-danger">Yes, Clear All</button>
+        <button id="confirmNo" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
 
-      const tableBody = document.querySelector("#plTable tbody");
-      const totalCell = document.getElementById("totalCell");
-      const counterEl = document.getElementById("counter");
+  <!-- Manual Entry Modal -->
+  <div id="manualModal" class="modal hidden">
+    <div class="modal-content card">
+      <h2>✍️ Manual Entry</h2>
+      <p>Enter PL code manually:</p>
+      <input id="manualInput" class="search-box" type="text" placeholder="P12AB1234567" />
+      <div style="display:flex; gap:12px;">
+        <button id="manualSubmit" class="btn">Add</button>
+        <button id="manualCancel" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
 
-      // Tab elements
-      const tabButtons = document.querySelectorAll(".tab");
-      const allCountEl = document.getElementById("allCount");
-      const unmatchedCountEl = document.getElementById("unmatchedCount");
-      const completedCountEl = document.getElementById("completedCount");
+<script>
+  // Constants and Configuration
+  const PL_CANON = /^P\d{2}[A-Z]{2}\d{7}$/;
+  const PL_FLEX_GLOBAL = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/gi;
+  const PL_FLEX = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/i;
+  const PL_X_MIN = 700, PL_X_MAX = 790;
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
+  const DEBOUNCE_DELAY = 300;
 
-      // State
-      let uniquePLs = [];
-      let plRowMap = new Map();
-      let scannedSet = new Set();
-      let scannedCount = 0;
-      let codeReader = null;
-      let availableCameras = [];
-      let currentCameraIndex = 0;
-      let activeTab = "all"; // 'all', 'unmatched', 'completed'
+  // DOM Elements
+  const elements = {
+    fileInput: document.getElementById("fileInput"),
+    fileDropZone: document.getElementById("fileDropZone"),
+    extractBtn: document.getElementById("extractBtn"),
+    extractStatus: document.getElementById("extractStatus"),
+    progressBar: document.getElementById("progressBar"),
+    progressFill: document.getElementById("progressFill"),
+    barcodeInput: document.getElementById("barcodeInput"),
+    scanStatus: document.getElementById("scanStatus"),
+    lastScan: document.getElementById("lastScan"),
+    tableBody: document.querySelector("#plTable tbody"),
+    totalCell: document.getElementById("totalCell"),
+    counterEl: document.getElementById("counter"),
+    clearBtn: document.getElementById("clearBtn"),
+    confirmModal: document.getElementById("confirmModal"),
+    confirmYes: document.getElementById("confirmYes"),
+    confirmNo: document.getElementById("confirmNo"),
+    manualBtn: document.getElementById("manualBtn"),
+    manualModal: document.getElementById("manualModal"),
+    manualInput: document.getElementById("manualInput"),
+    manualSubmit: document.getElementById("manualSubmit"),
+    manualCancel: document.getElementById("manualCancel"),
+    downloadBtn: document.getElementById("downloadBtn"),
+    unmatchedTable: document.getElementById("unmatchedTable").querySelector("tbody"),
+    summaryBreakdown: document.getElementById("summaryBreakdown"),
+    searchInput: document.getElementById("searchInput"),
+    filterAll: document.getElementById("filterAll"),
+    filterScanned: document.getElementById("filterScanned"),
+    filterPending: document.getElementById("filterPending")
+  };
 
-      // Utility functions
-      const normalize = (s) =>
-        (s || "")
-          .toString()
-          .replace(/[^A-Za-z0-9]/g, "")
-          .toUpperCase();
+  // Application State
+  let appState = {
+    uniquePLs: [],
+    plRowMap: new Map(),
+    scannedSet: new Set(),
+    scannedCount: 0,
+    unmatchedList: [],
+    currentFilter: 'all',
+    searchTerm: '',
+    isProcessing: false
+  };
 
-      function showStatus(element, message, type = "info") {
-        element.className = `status ${type}`;
-        element.textContent = message;
-        element.style.display = "block";
-      }
+  // Utility Functions
+  const normalize = (s) => (s || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  
+  const debounce = (func, delay) => {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func.apply(null, args), delay);
+    };
+  };
 
-      function triggerHaptic(element) {
-        if ("vibrate" in navigator) {
-          navigator.vibrate(50);
-        }
-        element.classList.add("haptic");
-        setTimeout(() => element.classList.remove("haptic"), 100);
-      }
+  const showStatus = (el, msg, type = "info") => {
+    el.className = `status ${type}`;
+    el.textContent = msg;
+  };
 
-      function updateProgress(percent) {
-        extractProgressBar.style.width = `${percent}%`;
-      }
-
-      function updateCounter() {
-        const total = uniquePLs.length;
-        const done = scannedCount >= total && total > 0;
-
-        if (total === 0) {
-          counterEl.textContent = "No codes loaded";
-          counterEl.className = "counter pending";
-        } else if (done) {
-          counterEl.textContent = `✅ All ${total} codes scanned!`;
-          counterEl.className = "counter success";
-          triggerHaptic(counterEl);
-        } else {
-          counterEl.textContent = `${scannedCount} / ${total} codes scanned`;
-          counterEl.className = "counter pending";
-        }
-      }
-
-      function updateTabCounts() {
-        const total = uniquePLs.length;
-        const completed = scannedCount;
-        const unmatched = total - completed;
-
-        allCountEl.textContent = total;
-        completedCountEl.textContent = completed;
-        unmatchedCountEl.textContent = unmatched;
-      }
-
-      function groupByMPL(pls) {
-        const groups = {};
-        pls.forEach((pl) => {
-          const mpl = pl.substring(0, 6); // P12AB format
-          if (!groups[mpl]) groups[mpl] = [];
-          groups[mpl].push(pl);
-        });
-        return groups;
-      }
-
-      function updateMPLProgress(mpl) {
-        // This function can be expanded later for MPL-specific progress tracking
-        console.log(`MPL ${mpl} progress updated`);
-      }
-
-      function renderTable() {
-        tableBody.innerHTML = "";
-        plRowMap.clear();
-
-        if (uniquePLs.length === 0) {
-          const emptyRow = document.createElement("tr");
-          emptyRow.innerHTML =
-            '<td colspan="4" style="text-align: center; padding: 40px; color: #718096;">Upload files to see PL codes here</td>';
-          tableBody.appendChild(emptyRow);
-          totalCell.textContent = "Total: 0 codes";
-          return;
-        }
-
-        // Filter based on active tab
-        let filteredPLs = uniquePLs;
-        if (activeTab === "completed") {
-          filteredPLs = uniquePLs.filter((pl) => scannedSet.has(normalize(pl)));
-        } else if (activeTab === "unmatched") {
-          filteredPLs = uniquePLs.filter(
-            (pl) => !scannedSet.has(normalize(pl))
-          );
-        }
-
-        filteredPLs.forEach((pl, i) => {
-          const tr = document.createElement("tr");
-          const isScanned = scannedSet.has(normalize(pl));
-          tr.innerHTML = `
-          <td style="text-align: center; font-weight: 600;">${i + 1}</td>
-          <td style="text-align: center;">
-            <input type="checkbox" style="transform: scale(1.2);" ${
-              isScanned ? "checked" : ""
-            }>
-          </td>
-          <td style="font-family: monospace; font-weight: 600;">${pl}</td>
-          <td class="remark-cell">${
-            isScanned ? "✅ Scanned" : "Ready to scan"
-          }</td>
-        `;
-
-          if (isScanned) {
-            tr.classList.add("scanned");
-          }
-
-          tableBody.appendChild(tr);
-          const checkbox = tr.querySelector('input[type="checkbox"]');
-          const remarkCell = tr.querySelector(".remark-cell");
-
-          plRowMap.set(normalize(pl), { row: tr, checkbox, remarkCell });
-        });
-
-        totalCell.textContent = `Total: ${filteredPLs.length} codes`;
-
-        // Update button states
-        startScanBtn.disabled = uniquePLs.length === 0;
-        clearBtn.disabled = uniquePLs.length === 0;
-
-        if (uniquePLs.length > 0) {
-          showStatus(
-            scanStatus,
-            "📷 Ready to scan - tap Start Scanner",
-            "success"
-          );
-        }
-      }
-
-      function flashRow(row, type = "success") {
-        row.classList.add(`flash-${type}`);
-        setTimeout(() => {
-          row.classList.remove(`flash-${type}`);
-        }, 500);
-      }
-
-      function onScanMatch(rawCode) {
-        const code = normalize(rawCode);
-        lastScan.textContent = `Last: ${code || rawCode}`;
-        lastScan.classList.remove("hidden");
-
-        // Find PL pattern in scanned code
-        PL_FLEX_GLOBAL.lastIndex = 0;
-        const matches = [...(rawCode.match(PL_FLEX_GLOBAL) || [])];
-        let candidate = null;
-
-        if (matches.length) {
-          candidate = normalize(matches[0]);
-        } else if (PL_CANON.test(code)) {
-          candidate = code;
-        }
-
-        if (!candidate) {
-          showStatus(
-            scanStatus,
-            `❌ No PL pattern found in: ${rawCode}`,
-            "error"
-          );
-          document.querySelector("#plTable").classList.add("flash-error");
-          setTimeout(
-            () =>
-              document
-                .querySelector("#plTable")
-                .classList.remove("flash-error"),
-            300
-          );
-          return;
-        }
-
-        const entry = plRowMap.get(candidate);
-        if (!entry) {
-          showStatus(
-            scanStatus,
-            `❌ Code not in list: ${candidate}`,
-            "warning"
-          );
-          document.querySelector("#plTable").classList.add("flash-warning");
-          setTimeout(
-            () =>
-              document
-                .querySelector("#plTable")
-                .classList.remove("flash-warning"),
-            300
-          );
-          return;
-        }
-
-        if (scannedSet.has(candidate)) {
-          entry.remarkCell.textContent = `✅ Already scanned (${new Date().toLocaleTimeString()})`;
-          showStatus(scanStatus, `⚠ Already scanned: ${candidate}`, "warning");
-          flashRow(entry.row, "warning");
-          return;
-        }
-
-        // Mark as scanned
-        scannedSet.add(candidate);
-        entry.checkbox.checked = true;
-        entry.row.classList.add("scanned");
-        entry.remarkCell.textContent = `✅ Scanned at ${new Date().toLocaleTimeString()}`;
-        flashRow(entry.row, "success");
-        scannedCount++;
-
-        updateCounter();
-        updateTabCounts();
-
-        // Auto-switch to unmatched tab if current item was removed from view
-        if (activeTab === "unmatched") {
-          renderTable(); // Refresh to remove completed items
-        }
-
-        showStatus(scanStatus, `✅ Matched: ${candidate}`, "success");
-        triggerHaptic(document.body);
-      }
-
-      // File handling
-      fileInput.addEventListener("change", (e) => {
-        const files = e.target.files;
-        if (files.length === 0) {
-          fileLabel.textContent = "📁 Tap to select PDF or image files";
-          return;
-        }
-
-        const fileNames = Array.from(files)
-          .map((f) => f.name)
-          .join(", ");
-        fileLabel.textContent = `📁 Selected: ${fileNames}`;
-      });
-
-      // Extraction functions
-      function sanitiseMatch(rawMatch) {
-        if (!rawMatch) return null;
-        const s = rawMatch
-          .replace(/\s+/g, "")
-          .replace(/[^A-Za-z0-9]/g, "")
-          .toUpperCase();
-        return PL_CANON.test(s) ? s : null;
-      }
-
-      function findAndSanitiseAll(rawText) {
-        const out = [];
-        if (!rawText) return out;
-        PL_FLEX_GLOBAL.lastIndex = 0;
-        let m;
-        while ((m = PL_FLEX_GLOBAL.exec(rawText)) !== null) {
-          const san = sanitiseMatch(m[0]);
-          if (san) out.push(san);
-        }
-        PL_FLEX_GLOBAL.lastIndex = 0;
-        return out;
-      }
-
-      async function extractPLsFromPDF(file, progressCallback) {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let found = [];
-
-        for (let p = 1; p <= pdf.numPages; p++) {
-          if (progressCallback) progressCallback((p / pdf.numPages) * 80);
-
-          const page = await pdf.getPage(p);
-          const textContent = await page.getTextContent();
-          const tokens = textContent.items.map((it) => ({
-            x: it.transform[4],
-            text: (it.str || "").trim(),
-          }));
-
-          // Token stitching approach
-          const pageCandidates = tokens.filter((t) => {
-            return (
-              (typeof t.x === "number" && t.x >= PL_X_MIN && t.x <= PL_X_MAX) ||
-              /^P\s*\d/i.test(t.text) ||
-              PL_FLEX.test(t.text)
-            );
-          });
-
-          for (let i = 0; i < pageCandidates.length; i++) {
-            let s = "";
-            for (let j = 0; j < 4 && i + j < pageCandidates.length; j++) {
-              s += pageCandidates[i + j].text;
-              const m = s.match(PL_FLEX);
-              if (m) {
-                const san = sanitiseMatch(m[0]);
-                if (san) found.push(san);
-              }
-            }
-          }
-
-          // Fallback to full page text
-          if (found.length === 0) {
-            const combined = textContent.items.map((it) => it.str).join(" ");
-            const hits = findAndSanitiseAll(combined);
-            found = found.concat(hits);
-          }
-        }
-
-        // OCR fallback if needed
-        if (found.length === 0) {
-          if (progressCallback) progressCallback(85);
-          for (let p = 1; p <= pdf.numPages; p++) {
-            const page = await pdf.getPage(p);
-            const viewport = page.getViewport({ scale: 2 });
-            const canvas = document.createElement("canvas");
-            canvas.width = Math.round(viewport.width);
-            canvas.height = Math.round(viewport.height);
-            const ctx = canvas.getContext("2d");
-            await page.render({ canvasContext: ctx, viewport }).promise;
-            const ocr = await Tesseract.recognize(canvas, "eng", {
-              logger: () => {},
-            });
-            const text = ocr.data?.text || "";
-            const hits = findAndSanitiseAll(text);
-            found = found.concat(hits);
-          }
-        }
-
-        return found;
-      }
-
-      async function extractPLsFromImage(file, progressCallback) {
-        if (progressCallback) progressCallback(20);
-        const blobURL = URL.createObjectURL(file);
-        if (progressCallback) progressCallback(50);
-        const ocr = await Tesseract.recognize(blobURL, "eng", {
-          logger: () => {},
-        });
-        if (progressCallback) progressCallback(90);
-        URL.revokeObjectURL(blobURL);
-        const text = ocr.data?.text || "";
-        return findAndSanitiseAll(text);
-      }
-
-      function finalizePLs(rawList) {
-        const sanitised = rawList.map((r) => normalize(r)).filter(Boolean);
-        const dedup = [...new Set(sanitised)];
-        const filtered = dedup.filter((x) => PL_CANON.test(x));
-        filtered.sort((a, b) => {
-          const prefixA = (a.match(/^P\d{2}[A-Z]{2}/)?.[0] || "").toLowerCase();
-          const prefixB = (b.match(/^P\d{2}[A-Z]{2}/)?.[0] || "").toLowerCase();
-          const numA = parseInt(a.match(/\d+$/)?.[0] || "0", 10);
-          const numB = parseInt(b.match(/\d+$/)?.[0] || "0", 10);
-          if (prefixA < prefixB) return -1;
-          if (prefixA > prefixB) return 1;
-          return numA - numB;
-        });
-        return filtered;
-      }
-
-      // Extract button handler
-      extractBtn.addEventListener("click", async () => {
-        const files = [...(fileInput.files || [])];
-        if (files.length === 0) {
-          showStatus(extractStatus, "❌ Please select files first", "error");
-          return;
-        }
-
-        extractBtn.disabled = true;
-        extractProgress.classList.remove("hidden");
-        showStatus(extractStatus, "🔍 Extracting PL codes...", "info");
-        updateProgress(0);
-
-        let allFound = [];
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          const baseProgress = (i / files.length) * 100;
-
-          try {
-            const type = (file.type || "").toLowerCase();
-            let fileResults = [];
-
-            if (type.includes("pdf")) {
-              fileResults = await extractPLsFromPDF(file, (progress) => {
-                updateProgress(baseProgress + progress / files.length);
-              });
-            } else {
-              fileResults = await extractPLsFromImage(file, (progress) => {
-                updateProgress(baseProgress + progress / files.length);
-              });
-            }
-
-            allFound = allFound.concat(fileResults);
-          } catch (err) {
-            console.error("Extraction error:", err);
-            showStatus(
-              extractStatus,
-              `❌ Error processing ${file.name}`,
-              "error"
-            );
-          }
-        }
-
-        updateProgress(100);
-        uniquePLs = finalizePLs(allFound);
-        renderTable();
-
-        extractBtn.disabled = false;
-        extractProgress.classList.add("hidden");
-
-        if (uniquePLs.length > 0) {
-          showStatus(
-            extractStatus,
-            `✅ Found ${uniquePLs.length} PL codes`,
-            "success"
-          );
-          triggerHaptic(extractStatus);
-        } else {
-          showStatus(
-            extractStatus,
-            "❌ No PL codes found - check file quality",
-            "error"
-          );
-        }
-      });
-
-      
-// Camera functionality (QuaggaJS)
-let quaggaRunning = false;
-
-async function initializeCameras() {
-  try {
-    const devices = await Quagga.CameraAccess.enumerateVideoDevices();
-    availableCameras = devices || [];
-    if (availableCameras.length > 1) {
-      switchCameraBtn.classList.remove("hidden");
+  const updateProgress = (percent) => {
+    elements.progressFill.style.width = `${percent}%`;
+    if (percent === 0) {
+      elements.progressBar.classList.add('hidden');
+    } else {
+      elements.progressBar.classList.remove('hidden');
     }
-    return availableCameras.length > 0;
-  } catch (error) {
-    console.error("Camera initialization error:", error);
-    return false;
-  }
-}
+  };
 
-function startQuaggaWithDevice(device) {
-  const deviceId = device?.deviceId || device?.id || device;
-  return new Promise((resolve, reject) => {
-    // Ensure camera permission first
-    navigator.mediaDevices.getUserMedia({
-      video: { deviceId: deviceId ? { exact: deviceId } : undefined, facingMode: deviceId ? undefined : "environment" }
-    }).then(() => {
-      Quagga.init({
-        inputStream: {
-          name: "Live",
-          type: "LiveStream",
-          target: videoEl, // use actual <video> element
-          constraints: {
-            deviceId: deviceId ? { exact: deviceId } : undefined,
-            facingMode: deviceId ? undefined : "environment"
-          }
-        },
-        decoder: { readers: ["code_128_reader"] },
-        locate: true
-      }, (err) => {
-        if (err) {
-          console.error("Quagga init error:", err);
-          reject(err);
-          return;
-        }
-        Quagga.start();
-        quaggaRunning = true;
-        Quagga.onDetected((data) => {
-          const code = data?.codeResult?.code;
-          if (code) onScanMatch(code);
-        });
-        resolve(true);
+  const validateFile = (file) => {
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`File "${file.name}" is too large. Maximum size is 50MB.`);
+    }
+    
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp'];
+    if (!validTypes.some(type => file.type === type || file.name.toLowerCase().endsWith(type.split('/')[1]))) {
+      throw new Error(`File "${file.name}" has an unsupported format.`);
+    }
+  };
+
+  // State Management Functions
+  const updateCounter = () => {
+    const total = appState.uniquePLs.length;
+    if (total === 0) {
+      elements.counterEl.textContent = "No codes loaded";
+      elements.counterEl.className = "counter pending";
+    } else if (appState.scannedCount >= total) {
+      elements.counterEl.textContent = `✅ All ${total} codes scanned!`;
+      elements.counterEl.className = "counter success";
+    } else {
+      elements.counterEl.textContent = `${appState.scannedCount} / ${total} codes scanned`;
+      elements.counterEl.className = "counter pending";
+    }
+  };
+
+  const updateClearBtnState = () => {
+    elements.clearBtn.disabled = appState.uniquePLs.length === 0;
+  };
+
+  const updateSummaryBreakdown = () => {
+    const total = appState.uniquePLs.length;
+    const scanned = appState.scannedSet.size;
+    const missing = total - scanned;
+    const unmatched = appState.unmatchedList.length;
+
+    if (total === 0) {
+      elements.summaryBreakdown.textContent = "No data loaded";
+      return;
+    }
+
+    elements.summaryBreakdown.innerHTML = `
+      Total: ${total} | 
+      <span style="color:#2f855a">✅ Scanned: ${scanned}</span> | 
+      <span style="color:#c53030">❌ Missing: ${missing}</span> | 
+      <span style="color:#d69e2e">⚠ Unmatched: ${unmatched}</span>
+    `;
+  };
+
+  // Filtering and Search Functions
+  const matchesFilter = (pl) => {
+    const norm = normalize(pl);
+    const isScanned = appState.scannedSet.has(norm);
+    
+    switch (appState.currentFilter) {
+      case 'scanned': return isScanned;
+      case 'pending': return !isScanned;
+      default: return true;
+    }
+  };
+
+  const matchesSearch = (pl) => {
+    if (!appState.searchTerm) return true;
+    return pl.toLowerCase().includes(appState.searchTerm.toLowerCase());
+  };
+
+  const getFilteredPLs = () => {
+    return appState.uniquePLs.filter(pl => matchesFilter(pl) && matchesSearch(pl));
+  };
+
+  // Rendering Functions
+  const renderTable = () => {
+    elements.tableBody.innerHTML = "";
+    appState.plRowMap.clear();
+
+    if (appState.uniquePLs.length === 0) {
+      elements.tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">Upload files to see PL codes here</td></tr>`;
+      elements.totalCell.textContent = "Total: 0 codes";
+      return;
+    }
+
+    const filteredPLs = getFilteredPLs();
+    
+    if (filteredPLs.length === 0) {
+      elements.tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">No codes match current filters</td></tr>`;
+      elements.totalCell.textContent = `Showing: 0 / ${appState.uniquePLs.length} codes`;
+      return;
+    }
+
+    filteredPLs.forEach((pl, displayIndex) => {
+      const actualIndex = appState.uniquePLs.indexOf(pl);
+      const norm = normalize(pl);
+      const isScanned = appState.scannedSet.has(norm);
+      const tr = document.createElement("tr");
+      
+      tr.innerHTML = `
+        <td>${actualIndex + 1}</td>
+        <td><input type="checkbox" ${isScanned ? "checked" : ""} data-pl="${norm}"></td>
+        <td style="font-family:monospace">${pl}</td>
+        <td class="remark-cell">${isScanned ? "✅ Scanned" : "❌ Not Scanned"}</td>
+      `;
+
+      if (isScanned) tr.classList.add("scanned");
+      elements.tableBody.appendChild(tr);
+      
+      appState.plRowMap.set(norm, {
+        row: tr,
+        checkbox: tr.querySelector("input"),
+        remarkCell: tr.querySelector(".remark-cell")
       });
-    }).catch((err) => {
-      console.error("Camera permission denied or unavailable:", err);
-      reject(err);
+    });
+
+    elements.totalCell.textContent = `Showing: ${filteredPLs.length} / ${appState.uniquePLs.length} codes`;
+
+    // Add checkbox event listeners
+    elements.tableBody.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+      checkbox.addEventListener('change', (e) => {
+        const pl = e.target.dataset.pl;
+        const entry = appState.plRowMap.get(pl);
+        
+        if (e.target.checked && !appState.scannedSet.has(pl)) {
+          onScanMatch(pl, "Manual Check");
+        } else if (!e.target.checked && appState.scannedSet.has(pl)) {
+          // Remove from scanned
+          appState.scannedSet.delete(pl);
+          appState.scannedCount--;
+          entry.row.classList.remove("scanned");
+          entry.remarkCell.textContent = "❌ Not Scanned";
+          updateCounter();
+          updateSummaryBreakdown();
+        }
+      });
+    });
+  };
+
+  const renderUnmatched = () => {
+    elements.unmatchedTable.innerHTML = "";
+
+    if (appState.unmatchedList.length === 0) {
+      elements.unmatchedTable.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">No unmatched codes</td></tr>`;
+      return;
+    }
+
+    appState.unmatchedList.forEach((item, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td style="font-family:monospace">${item.code}</td>
+        <td>${item.source}</td>
+        <td>${item.time}</td>
+      `;
+      elements.unmatchedTable.appendChild(tr);
+    });
+  };
+
+  // Scanning Functions
+  const onScanMatch = (rawCode, source = "Scanner") => {
+    const code = normalize(rawCode);
+    elements.lastScan.textContent = `Last: ${code}`;
+    elements.lastScan.classList.remove("hidden");
+
+    if (!PL_CANON.test(code)) {
+      showStatus(elements.scanStatus, `❌ Invalid PL code: ${rawCode}`, "error");
+      return;
+    }
+
+    const entry = appState.plRowMap.get(code);
+    if (!entry) {
+      // Check if it exists in the full list but is filtered out
+      const exists = appState.uniquePLs.some(pl => normalize(pl) === code);
+      if (exists) {
+        showStatus(elements.scanStatus, `⚠ Code filtered out, clearing filters...`, "warning");
+        // Clear filters to show the code
+        appState.currentFilter = 'all';
+        appState.searchTerm = '';
+        elements.searchInput.value = '';
+        updateFilterButtons();
+        renderTable();
+        // Try again
+        setTimeout(() => onScanMatch(rawCode, source), 100);
+        return;
+      }
+      
+      showStatus(elements.scanStatus, `❌ Code not in list: ${code}`, "error");
+      appState.unmatchedList.push({
+        code: code,
+        source: source,
+        time: new Date().toLocaleTimeString()
+      });
+      renderUnmatched();
+      updateSummaryBreakdown();
+      return;
+    }
+
+    if (appState.scannedSet.has(code)) {
+      entry.remarkCell.textContent = "✅ Already scanned";
+      showStatus(elements.scanStatus, `⚠ Already scanned: ${code}`, "warning");
+      return;
+    }
+
+    appState.scannedSet.add(code);
+    entry.checkbox.checked = true;
+    entry.row.classList.add("scanned");
+    entry.remarkCell.textContent = `✅ Scanned at ${new Date().toLocaleTimeString()}`;
+    appState.scannedCount++;
+
+    updateCounter();
+    showStatus(elements.scanStatus, `✅ Matched: ${code}`, "success");
+    updateSummaryBreakdown();
+  };
+
+  // File Processing Functions
+  const sanitiseMatch = (raw) => {
+    if (!raw) return null;
+    const s = raw.replace(/\s+/g, "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    return PL_CANON.test(s) ? s : null;
+  };
+
+  const findAndSanitiseAll = (text) => {
+    const out = [];
+    if (!text) return out;
+    PL_FLEX_GLOBAL.lastIndex = 0;
+    let m;
+    while ((m = PL_FLEX_GLOBAL.exec(text)) !== null) {
+      const san = sanitiseMatch(m[0]);
+      if (san) out.push(san);
+    }
+    return out;
+  };
+
+  const extractPLsFromPDF = async (file) => {
+    if (typeof pdfjsLib === 'undefined') {
+      throw new Error('PDF.js library not loaded. Please check your internet connection and refresh the page.');
+    }
+    
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      const pdf = await pdfjsLib.getDocument({ data }).promise;
+      let found = [];
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        updateProgress((i / pdf.numPages) * 100);
+        
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        
+        // Look for PL codes in specific positions and generally
+        const pageCandidates = [];
+        textContent.items.forEach(t => {
+          if (t.str && ((t.transform[4] >= PL_X_MIN && t.transform[4] <= PL_X_MAX && PL_FLEX.test(t.str)) || PL_FLEX.test(t.str))) {
+            pageCandidates.push({ text: t.str, x: t.transform[4] });
+          }
+        });
+
+        pageCandidates.forEach(c => {
+          const san = sanitiseMatch(c.text);
+          if (san) found.push(san);
+        });
+
+        // Also check the joined text
+        const joined = textContent.items.map(it => it.str || '').join(" ");
+        found.push(...findAndSanitiseAll(joined));
+      }
+
+      return found;
+    } catch (error) {
+      console.error('PDF extraction error:', error);
+      throw new Error(`Failed to extract from PDF: ${error.message}`);
+    }
+  };
+
+  const extractPLsFromImage = async (file) => {
+    if (typeof Tesseract === 'undefined') {
+      throw new Error('Tesseract.js library not loaded. Please check your internet connection and refresh the page.');
+    }
+    
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('OCR processing timeout (30 seconds)'));
+      }, 30000); // 30 second timeout
+
+      Tesseract.recognize(file, "eng", {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            updateProgress(m.progress * 100);
+          }
+        }
+      }).then(({ data: { text } }) => {
+        clearTimeout(timeoutId);
+        resolve(findAndSanitiseAll(text));
+      }).catch((error) => {
+        clearTimeout(timeoutId);
+        reject(new Error(`OCR failed: ${error.message}`));
+      });
+    });
+  };
+
+  const finalizePLs = (arr) => {
+    const set = new Set();
+    arr.forEach(c => set.add(normalize(c)));
+    return Array.from(set).filter(c => PL_CANON.test(c)).sort();
+  };
+
+  // Filter Functions
+  const updateFilterButtons = () => {
+    document.querySelectorAll('[id^="filter"]').forEach(btn => {
+      btn.style.backgroundColor = btn.id === `filter${appState.currentFilter.charAt(0).toUpperCase() + appState.currentFilter.slice(1)}` || 
+                                  (btn.id === 'filterAll' && appState.currentFilter === 'all') ? '#3182ce' : '#718096';
+    });
+  };
+
+  // Event Listeners
+  elements.fileDropZone.addEventListener('click', () => elements.fileInput.click());
+
+  // Drag and drop
+  elements.fileDropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    elements.fileDropZone.classList.add('drag-over');
+  });
+
+  elements.fileDropZone.addEventListener('dragleave', () => {
+    elements.fileDropZone.classList.remove('drag-over');
+  });
+
+  elements.fileDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    elements.fileDropZone.classList.remove('drag-over');
+    elements.fileInput.files = e.dataTransfer.files;
+  });
+
+  elements.barcodeInput.addEventListener("blur", () => 
+    setTimeout(() => elements.barcodeInput.focus(), 200)
+  );
+
+  elements.barcodeInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const val = elements.barcodeInput.value.trim();
+      if (val) {
+        onScanMatch(val, "Scanner");
+        elements.barcodeInput.value = "";
+      }
+    }
+  });
+
+  // Manual entry
+  elements.manualBtn.addEventListener("click", () => {
+    elements.manualInput.value = "";
+    elements.manualModal.classList.remove("hidden");
+    setTimeout(() => elements.manualInput.focus(), 200);
+  });
+
+  elements.manualCancel.addEventListener("click", () => {
+    elements.manualModal.classList.add("hidden");
+  });
+
+  elements.manualSubmit.addEventListener("click", () => {
+    const val = elements.manualInput.value.trim();
+    if (val) {
+      elements.manualModal.classList.add("hidden");
+      onScanMatch(val, "Manual");
+    }
+  });
+
+  elements.manualInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      elements.manualSubmit.click();
+    }
+  });
+
+  // Clear functionality
+  elements.clearBtn.addEventListener("click", () => {
+    elements.confirmModal.classList.remove("hidden");
+  });
+
+  elements.confirmYes.addEventListener("click", () => {
+    appState.scannedSet.clear();
+    appState.scannedCount = 0;
+    appState.plRowMap.forEach((entry) => {
+      entry.checkbox.checked = false;
+      entry.row.classList.remove("scanned");
+      entry.remarkCell.textContent = "❌ Not Scanned";
+    });
+    appState.unmatchedList = [];
+    renderUnmatched();
+    updateCounter();
+    renderTable();
+    elements.lastScan.classList.add("hidden");
+    showStatus(elements.scanStatus, "🧹 All marks cleared", "info");
+    elements.confirmModal.classList.add("hidden");
+    updateSummaryBreakdown();
+  });
+
+  elements.confirmNo.addEventListener("click", () => {
+    elements.confirmModal.classList.add("hidden");
+  });
+
+  // Search and filter
+  const debouncedSearch = debounce(() => {
+    appState.searchTerm = elements.searchInput.value.trim();
+    renderTable();
+  }, DEBOUNCE_DELAY);
+
+  elements.searchInput.addEventListener("input", debouncedSearch);
+
+  elements.filterAll.addEventListener("click", () => {
+    appState.currentFilter = 'all';
+    updateFilterButtons();
+    renderTable();
+  });
+
+  elements.filterScanned.addEventListener("click", () => {
+    appState.currentFilter = 'scanned';
+    updateFilterButtons();
+    renderTable();
+  });
+
+  elements.filterPending.addEventListener("click", () => {
+    appState.currentFilter = 'pending';
+    updateFilterButtons();
+    renderTable();
+  });
+
+  // Download functionality
+  elements.downloadBtn.addEventListener("click", () => {
+    if (appState.uniquePLs.length === 0) {
+      alert("❌ No PL codes to download");
+      return;
+    }
+
+    try {
+      let rows = [["PL Code", "Status", "Timestamp", "Index"]];
+
+      appState.uniquePLs.forEach((pl, index) => {
+        const norm = normalize(pl);
+        const entry = appState.plRowMap.get(norm);
+        let status = "❌ Not Scanned";
+        let timestamp = "";
+
+        if (appState.scannedSet.has(norm)) {
+          status = "✅ Scanned";
+          const text = entry?.remarkCell?.textContent || "";
+          const match = text.match(/at (.+)$/);
+          if (match) timestamp = match[1];
+        }
+
+        rows.push([pl, status, timestamp, index + 1]);
+      });
+
+      // Add unmatched entries
+      if (appState.unmatchedList.length > 0) {
+        rows.push([]);
+        rows.push(["=== UNMATCHED ENTRIES ==="]);
+        appState.unmatchedList.forEach(u => {
+          rows.push([u.code, `⚠️ Unmatched (${u.source})`, u.time, ""]);
+        });
+      }
+
+      // Add summary
+      rows.push([]);
+      rows.push([
+        "SUMMARY",
+        `Total: ${appState.uniquePLs.length}`,
+        `✅ Scanned: ${appState.scannedSet.size}`,
+        `❌ Missing: ${appState.uniquePLs.length - appState.scannedSet.size}`
+      ]);
+      rows.push([
+        "",
+        `⚠ Unmatched: ${appState.unmatchedList.length}`,
+        `Generated: ${new Date().toLocaleString()}`,
+        ""
+      ]);
+
+      const csvContent = rows.map(r => r.map(f => `"${f}"`).join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pl-codes-summary-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showStatus(elements.scanStatus, "✅ Summary downloaded", "success");
+    } catch (error) {
+      console.error('Download error:', error);
+      alert("❌ Error generating download");
+    }
+  });
+
+  // Extract functionality with better error handling
+  elements.extractBtn.addEventListener("click", async () => {
+    if (appState.isProcessing) return;
+
+    const files = Array.from(elements.fileInput.files);
+    if (files.length === 0) {
+      showStatus(elements.extractStatus, "❌ Please select files first", "error");
+      return;
+    }
+
+    // Check if libraries are loaded
+    const pdfOK = typeof pdfjsLib !== 'undefined';
+    const ocrOK = typeof Tesseract !== 'undefined';
+    
+    const hasPDFs = files.some(f => f.type === 'application/pdf');
+    const hasImages = files.some(f => f.type.startsWith('image/'));
+    
+    if (hasPDFs && !pdfOK) {
+      showStatus(elements.extractStatus, "❌ PDF.js library failed to load. Please refresh the page.", "error");
+      return;
+    }
+    
+    if (hasImages && !ocrOK) {
+      showStatus(elements.extractStatus, "❌ Tesseract.js library failed to load. Please refresh the page.", "error");
+      return;
+    }
+
+    appState.isProcessing = true;
+    elements.extractBtn.disabled = true;
+    elements.extractBtn.textContent = "🔄 Processing...";
+    showStatus(elements.extractStatus, "Processing files...", "info");
+    updateProgress(0);
+
+    try {
+      // Validate all files first
+      for (const file of files) {
+        validateFile(file);
+      }
+
+      let allCodes = [];
+      let processedFiles = 0;
+      let errorCount = 0;
+
+      for (const file of files) {
+        showStatus(elements.extractStatus, `Processing: ${file.name}`, "info");
+        
+        try {
+          let codes = [];
+          if (file.type === "application/pdf") {
+            codes = await extractPLsFromPDF(file);
+          } else if (file.type.startsWith("image/")) {
+            codes = await extractPLsFromImage(file);
+          }
+          
+          allCodes.push(...codes);
+          processedFiles++;
+        } catch (error) {
+          console.error(`Error processing ${file.name}:`, error);
+          errorCount++;
+          showStatus(elements.extractStatus, `⚠ Error in ${file.name}: ${error.message}`, "warning");
+          
+          // Continue processing other files
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause to show error
+        }
+      }
+
+      // Finalize and update state
+      appState.uniquePLs = finalizePLs(allCodes);
+      appState.scannedSet.clear();
+      appState.scannedCount = 0;
+      appState.unmatchedList = [];
+      appState.currentFilter = 'all';
+      appState.searchTerm = '';
+      elements.searchInput.value = '';
+
+      // Update UI
+      renderTable();
+      renderUnmatched();
+      updateCounter();
+      updateClearBtnState();
+      updateSummaryBreakdown();
+      updateFilterButtons();
+
+      updateProgress(0);
+      
+      let statusMessage = `✅ Extracted ${appState.uniquePLs.length} unique codes`;
+      if (errorCount > 0) {
+        statusMessage += ` (${errorCount} files had errors)`;
+      }
+      
+      showStatus(elements.extractStatus, statusMessage, errorCount > 0 ? "warning" : "success");
+      showStatus(elements.scanStatus, "🎯 Ready to scan codes", "info");
+
+    } catch (error) {
+      console.error('Extraction error:', error);
+      showStatus(elements.extractStatus, `❌ Error: ${error.message}`, "error");
+      updateProgress(0);
+    } finally {
+      appState.isProcessing = false;
+      elements.extractBtn.disabled = false;
+      elements.extractBtn.textContent = "🔍 Extract PL Codes";
+    }
+  });
+
+  // Modal click outside to close
+  [elements.confirmModal, elements.manualModal].forEach(modal => {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+      }
     });
   });
-}
 
-startScanBtn.addEventListener("click", async () => {
-  const hasCamera = await initializeCameras();
-  if (!hasCamera) {
-    showStatus(scanStatus, "❌ No camera found", "error");
-    return;
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Escape to close modals
+    if (e.key === 'Escape') {
+      elements.confirmModal.classList.add('hidden');
+      elements.manualModal.classList.add('hidden');
+    }
+    
+    // Ctrl/Cmd + / to focus search
+    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+      e.preventDefault();
+      elements.searchInput.focus();
+    }
+    
+    // Ctrl/Cmd + Enter to focus barcode input
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      elements.barcodeInput.focus();
+    }
+  });
+
+  // Initialize
+  updateCounter();
+  updateClearBtnState();
+  updateSummaryBreakdown();
+  updateFilterButtons();
+
+  // Auto-focus barcode input when ready
+  if (elements.barcodeInput) {
+    elements.barcodeInput.focus();
   }
-  const backCamera =
-    availableCameras.find((d) => /back|rear|environment/i.test(d.label)) ||
-    availableCameras[currentCameraIndex] ||
-    availableCameras[0];
-  await startQuaggaWithDevice(backCamera);
-  videoContainer.classList.remove("hidden");
-  videoEl.classList.remove("hidden");
-  videoContainer.scrollIntoView({ behavior: "smooth" }); // auto-scroll to scanner
-  startScanBtn.disabled = true;
-  stopScanBtn.disabled = false;
-  showStatus(scanStatus, "📷 Scanning... Point at PL codes", "success");
-});
 
-stopScanBtn.addEventListener("click", () => {
-  if (quaggaRunning) {
-    Quagga.stop();
-    quaggaRunning = false;
-  }
-  videoContainer.classList.add("hidden");
-  startScanBtn.disabled = uniquePLs.length === 0;
-  stopScanBtn.disabled = true;
-  switchCameraBtn.classList.add("hidden");
-  showStatus(scanStatus, "⏸ Scanner stopped", "info");
-});
+  // Offline status indicator
+  const createOfflineIndicator = () => {
+    const indicator = document.createElement('div');
+    indicator.id = 'offlineIndicator';
+    indicator.style.cssText = `
+      position: fixed; top: 10px; right: 10px; z-index: 2000;
+      padding: 8px 16px; border-radius: 20px; font-size: 14px;
+      font-weight: 600; transition: all 0.3s ease;
+      display: none;
+    `;
+    document.body.appendChild(indicator);
+    return indicator;
+  };
 
-switchCameraBtn.addEventListener("click", async () => {
-  if (availableCameras.length <= 1) return;
-  currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-  const camera = availableCameras[currentCameraIndex];
-  if (quaggaRunning) {
-    Quagga.stop();
-    quaggaRunning = false;
-  }
-  await startQuaggaWithDevice(camera);
-  const cameraType = /back|rear|environment/i.test(camera.label)
-    ? "📷 Back"
-    : "🤳 Front";
-  showStatus(scanStatus, `${cameraType} camera active`, "success");
-});
+  const offlineIndicator = createOfflineIndicator();
 
-window.addEventListener("beforeunload", () => {
-  if (quaggaRunning) {
-    Quagga.stop();
-    quaggaRunning = false;
-  }
-});
+  const updateOfflineStatus = () => {
+    if (navigator.onLine) {
+      offlineIndicator.style.display = 'none';
+    } else {
+      offlineIndicator.textContent = '📡 Offline Mode';
+      offlineIndicator.style.cssText += 'background: #fed7d7; color: #c53030; display: block;';
+    }
+  };
 
-clearBtn.addEventListener("click", () => {
-        scannedSet.clear();
-        scannedCount = 0;
+  // Check if external resources loaded successfully
+  const checkResourcesLoaded = () => {
+    const resourcesOK = typeof pdfjsLib !== 'undefined' && typeof Tesseract !== 'undefined';
+    if (!resourcesOK && !navigator.onLine) {
+      offlineIndicator.textContent = '⚠️ Limited Offline Mode - File processing unavailable';
+      offlineIndicator.style.cssText += 'background: #fef5e7; color: #d69e2e; display: block;';
+    }
+    return resourcesOK;
+  };
 
-        plRowMap.forEach((entry) => {
-          entry.checkbox.checked = false;
-          entry.row.classList.remove("scanned");
-          entry.remarkCell.textContent = "Ready to scan";
-        });
+  // Network status listeners
+  window.addEventListener('online', updateOfflineStatus);
+  window.addEventListener('offline', updateOfflineStatus);
+  
+  // Initial check
+  updateOfflineStatus();
+  setTimeout(checkResourcesLoaded, 1000);
 
-        updateCounter();
-        updateTabCounts();
-        renderTable(); // Refresh the current tab view
-        lastScan.classList.add("hidden");
-        showStatus(scanStatus, "🧹 All marks cleared", "info");
-        triggerHaptic(clearBtn);
-      });
-
-      // Cleanup on page unload
-      window.addEventListener("beforeunload", async () => {
-        if (codeReader) {
-          await codeReader.reset();
-        }
-      });
-
-      // Tab switching functionality
-      tabButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-          // Update active tab
-          tabButtons.forEach((btn) => btn.classList.remove("active"));
-          button.classList.add("active");
-
-          // Update active tab state
-          activeTab = button.dataset.tab;
-
-          // Re-render table with filtered data
-          renderTable();
-
-          // Haptic feedback
-          triggerHaptic(button);
-        });
-      });
-
-      // Initialize
-      updateCounter();
-      updateTabCounts();
-      renderTable();
-    </script>
-  </body>
+</script>
+</body>
 </html>

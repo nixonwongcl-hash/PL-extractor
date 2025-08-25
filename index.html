@@ -49,6 +49,14 @@
     .search-box { width:100%; padding:12px; font-size:16px; border-radius:8px; border:1px solid #cbd5e0; margin-bottom:12px; }
     .search-box:focus { outline:none; border-color:#3182ce; box-shadow:0 0 0 3px rgba(49, 130, 206, 0.1); }
     
+    /* Toggle Switch Styles */
+    .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e0; transition: .3s; border-radius: 24px; }
+    .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .toggle-slider { background-color: #3182ce; }
+    input:checked + .toggle-slider:before { transform: translateX(20px); }
+    
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes highlightScan { 0% { background:#c6f6d5 !important; transform: scale(1.02); } 100% { background:#f0fff4 !important; transform: scale(1); } }
     @keyframes modalSlide { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
@@ -86,7 +94,16 @@
     <!-- Scanner -->
     <div class="card">
       <h2>📱 Barcode Scanner</h2>
-      <input id="barcodeInput" class="search-box" type="text" placeholder="Scan barcode here..." autofocus />
+      <div style="display:flex; gap:12px; margin-bottom:12px;">
+        <input id="barcodeInput" class="search-box" type="text" placeholder="Scan barcode here..." autofocus style="flex:1;" />
+        <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; background:#f7fafc; border-radius:8px; border:1px solid #cbd5e0; min-width:140px;">
+          <span id="scanModeLabel" style="font-size:14px; font-weight:500; color:#4a5568;">Single</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="scanModeToggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
       <div style="display:flex; gap:12px; margin-bottom:12px;">
         <button id="clearBtn" class="btn btn-secondary" disabled>🧹 Clear All</button>
         <button id="manualBtn" class="btn btn-secondary">✍️ Manual Entry</button>
@@ -110,9 +127,9 @@
       <div id="counter" class="counter pending">No codes loaded</div>
       <div class="table-container">
         <table id="plTable">
-          <thead><tr><th>#</th><th>✓</th><th>PL Code</th><th>Status</th></tr></thead>
-          <tbody><tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">Upload files to see PL codes here</td></tr></tbody>
-          <tfoot><tr><td colspan="4" id="totalCell">Total: 0 codes</td></tr></tfoot>
+          <thead><tr><th>#</th><th>✓</th><th>PL Code</th><th>Count</th><th>Status</th></tr></thead>
+          <tbody><tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">Upload files to see PL codes here</td></tr></tbody>
+          <tfoot><tr><td colspan="5" id="totalCell">Total: 0 codes</td></tr></tfoot>
         </table>
       </div>
       <div style="margin-top:16px;">
@@ -125,8 +142,23 @@
       <h2>⚠️ Unmatched Entries</h2>
       <div class="table-container">
         <table id="unmatchedTable">
-          <thead><tr><th>#</th><th>Code</th><th>Source</th><th>Timestamp</th></tr></thead>
-          <tbody><tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">No unmatched codes</td></tr></tbody>
+          <thead><tr><th>#</th><th>Code</th><th>Source</th><th>Timestamp</th><th>Action</th></tr></thead>
+          <tbody><tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">No unmatched codes</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Scan History -->
+    <div class="card">
+      <h2>📜 Scan History</h2>
+      <div style="display:flex; gap:12px; margin-bottom:12px;">
+        <button id="showHistoryBtn" class="btn btn-secondary" style="width:auto; padding:8px 16px;">Show History</button>
+        <button id="clearHistoryBtn" class="btn btn-danger" style="width:auto; padding:8px 16px;">Clear History</button>
+      </div>
+      <div class="table-container" id="historyContainer" style="display:none; max-height:300px;">
+        <table id="historyTable">
+          <thead><tr><th>#</th><th>PL Code</th><th>Source</th><th>Time</th></tr></thead>
+          <tbody></tbody>
         </table>
       </div>
     </div>
@@ -175,6 +207,8 @@
     progressBar: document.getElementById("progressBar"),
     progressFill: document.getElementById("progressFill"),
     barcodeInput: document.getElementById("barcodeInput"),
+    scanModeToggle: document.getElementById("scanModeToggle"),
+    scanModeLabel: document.getElementById("scanModeLabel"),
     scanStatus: document.getElementById("scanStatus"),
     lastScan: document.getElementById("lastScan"),
     tableBody: document.querySelector("#plTable tbody"),
@@ -195,7 +229,11 @@
     searchInput: document.getElementById("searchInput"),
     filterAll: document.getElementById("filterAll"),
     filterScanned: document.getElementById("filterScanned"),
-    filterPending: document.getElementById("filterPending")
+    filterPending: document.getElementById("filterPending"),
+    showHistoryBtn: document.getElementById("showHistoryBtn"),
+    clearHistoryBtn: document.getElementById("clearHistoryBtn"),
+    historyContainer: document.getElementById("historyContainer"),
+    historyTable: document.getElementById("historyTable").querySelector("tbody")
   };
 
   // Application State
@@ -207,11 +245,19 @@
     unmatchedList: [],
     currentFilter: 'all',
     searchTerm: '',
-    isProcessing: false
+    isProcessing: false,
+    scanCounts: new Map(), // Track multiple scans per PL
+    scanHistory: [] // Complete scan history
   };
 
   // Utility Functions
   const normalize = (s) => (s || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  
+  // Extract MPL from PL code (first 4 characters: P + 2 digits + 2 letters)
+  const extractMPL = (plCode) => {
+    if (!plCode || plCode.length < 4) return '';
+    return plCode.substring(0, 4); // P12AB from P12AB1234567
+  };
   
   const debounce = (func, delay) => {
     let timeoutId;
@@ -311,7 +357,7 @@
     appState.plRowMap.clear();
 
     if (appState.uniquePLs.length === 0) {
-      elements.tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">Upload files to see PL codes here</td></tr>`;
+      elements.tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">Upload files to see PL codes here</td></tr>`;
       elements.totalCell.textContent = "Total: 0 codes";
       return;
     }
@@ -319,35 +365,59 @@
     const filteredPLs = getFilteredPLs();
     
     if (filteredPLs.length === 0) {
-      elements.tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">No codes match current filters</td></tr>`;
+      elements.tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">No codes match current filters</td></tr>`;
       elements.totalCell.textContent = `Showing: 0 / ${appState.uniquePLs.length} codes`;
       return;
     }
 
-    filteredPLs.forEach((pl, displayIndex) => {
-      const actualIndex = appState.uniquePLs.indexOf(pl);
-      const norm = normalize(pl);
-      const isScanned = appState.scannedSet.has(norm);
-      const tr = document.createElement("tr");
-      
-      tr.innerHTML = `
-        <td>${actualIndex + 1}</td>
-        <td><input type="checkbox" ${isScanned ? "checked" : ""} data-pl="${norm}"></td>
-        <td style="font-family:monospace">${pl}</td>
-        <td class="remark-cell">${isScanned ? "✅ Scanned" : "❌ Not Scanned"}</td>
-      `;
+    // Group PLs by MPL for better organization
+    const groupedPLs = new Map();
+    filteredPLs.forEach(pl => {
+      const mpl = extractMPL(pl);
+      if (!groupedPLs.has(mpl)) {
+        groupedPLs.set(mpl, []);
+      }
+      groupedPLs.get(mpl).push(pl);
+    });
 
-      if (isScanned) tr.classList.add("scanned");
-      elements.tableBody.appendChild(tr);
+    // Sort MPL groups
+    const sortedMPLs = Array.from(groupedPLs.keys()).sort();
+    
+    sortedMPLs.forEach(mpl => {
+      // Add MPL subheading row
+      const mplRow = document.createElement("tr");
+      mplRow.innerHTML = `<td colspan="5" style="background:#e2e8f0; font-weight:600; color:#2d3748; text-align:center; padding:8px;">📦 MPL: ${mpl} (${groupedPLs.get(mpl).length} codes)</td>`;
+      elements.tableBody.appendChild(mplRow);
       
-      appState.plRowMap.set(norm, {
-        row: tr,
-        checkbox: tr.querySelector("input"),
-        remarkCell: tr.querySelector(".remark-cell")
+      // Add PL codes for this MPL
+      groupedPLs.get(mpl).forEach(pl => {
+        const actualIndex = appState.uniquePLs.indexOf(pl);
+        const norm = normalize(pl);
+        const isScanned = appState.scannedSet.has(norm);
+        const scanCount = appState.scanCounts.get(norm) || 0;
+        const tr = document.createElement("tr");
+        
+        tr.innerHTML = `
+          <td style="padding-left:20px;">${actualIndex + 1}</td>
+          <td><input type="checkbox" ${isScanned ? "checked" : ""} data-pl="${norm}"></td>
+          <td style="font-family:monospace">${pl}</td>
+          <td class="count-cell">${scanCount > 0 ? `${scanCount}x` : '-'}</td>
+          <td class="remark-cell">${isScanned ? `✅ Scanned ${scanCount}x` : "❌ Not Scanned"}</td>
+        `;
+
+        if (isScanned) tr.classList.add("scanned");
+        elements.tableBody.appendChild(tr);
+        
+        appState.plRowMap.set(norm, {
+          row: tr,
+          checkbox: tr.querySelector("input"),
+          countCell: tr.querySelector(".count-cell"),
+          remarkCell: tr.querySelector(".remark-cell")
+        });
       });
     });
 
-    elements.totalCell.textContent = `Showing: ${filteredPLs.length} / ${appState.uniquePLs.length} codes`;
+    elements.totalCell.textContent = `Showing: ${filteredPLs.length} / ${appState.uniquePLs.length} codes (${sortedMPLs.length} MPL groups)`;
 
     // Add checkbox event listeners
     elements.tableBody.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
@@ -370,21 +440,46 @@
     });
   };
 
+  const renderHistory = () => {
+    elements.historyTable.innerHTML = "";
+    
+    if (appState.scanHistory.length === 0) {
+      elements.historyTable.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#718096">No scan history</td></tr>`;
+      return;
+    }
+
+    // Show most recent first
+    const reversedHistory = [...appState.scanHistory].reverse();
+    reversedHistory.forEach((item, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${appState.scanHistory.length - i}</td>
+        <td style="font-family:monospace">${item.code}</td>
+        <td>${item.source}</td>
+        <td>${item.time}</td>
+      `;
+      elements.historyTable.appendChild(tr);
+    });
+  };
+
   const renderUnmatched = () => {
     elements.unmatchedTable.innerHTML = "";
 
     if (appState.unmatchedList.length === 0) {
-      elements.unmatchedTable.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:40px; color:#718096">No unmatched codes</td></tr>`;
+      elements.unmatchedTable.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">No unmatched codes</td></tr>`;
       return;
     }
 
     appState.unmatchedList.forEach((item, i) => {
       const tr = document.createElement("tr");
+      const originalText = item.original ? `<br><small style="color:#718096">Original: ${item.original}</small>` : '';
       tr.innerHTML = `
         <td>${i + 1}</td>
-        <td style="font-family:monospace">${item.code}</td>
+        <td style="font-family:monospace">${item.code}${originalText}</td>
         <td>${item.source}</td>
         <td>${item.time}</td>
+        <td><button onclick="this.parentElement.parentElement.remove(); appState.unmatchedList.splice(${i}, 1); updateSummaryBreakdown(); renderUnmatched();" 
+            style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;">Remove</button></td>
       `;
       elements.unmatchedTable.appendChild(tr);
     });
@@ -393,11 +488,25 @@
   // Scanning Functions
   const onScanMatch = (rawCode, source = "Scanner") => {
     const code = normalize(rawCode);
-    elements.lastScan.textContent = `Last: ${code}`;
+    const scanMode = elements.scanModeToggle.checked ? 'multiple' : 'unique';
+    const timestamp = new Date().toLocaleTimeString();
+    
+    elements.lastScan.textContent = `Last: ${rawCode} → ${code}`;
     elements.lastScan.classList.remove("hidden");
 
+    // Check format validity first
     if (!PL_CANON.test(code)) {
       showStatus(elements.scanStatus, `❌ Invalid PL code: ${rawCode}`, "error");
+      
+      // Add invalid codes to unmatched list for tracking
+      appState.unmatchedList.push({
+        code: code,
+        source: `${source} (Other PL)`,
+        time: timestamp,
+        original: rawCode !== code ? rawCode : undefined
+      });
+      renderUnmatched();
+      updateSummaryBreakdown();
       return;
     }
 
@@ -421,28 +530,51 @@
       showStatus(elements.scanStatus, `❌ Code not in list: ${code}`, "error");
       appState.unmatchedList.push({
         code: code,
-        source: source,
-        time: new Date().toLocaleTimeString()
+        source: `${source} (Not in List)`,
+        time: timestamp,
+        original: rawCode !== code ? rawCode : undefined
       });
       renderUnmatched();
       updateSummaryBreakdown();
       return;
     }
 
-    if (appState.scannedSet.has(code)) {
-      entry.remarkCell.textContent = "✅ Already scanned";
-      showStatus(elements.scanStatus, `⚠ Already scanned: ${code}`, "warning");
+    // Add to scan history regardless of mode
+    appState.scanHistory.push({
+      code: code,
+      source: source,
+      time: timestamp,
+      original: rawCode
+    });
+
+    // Get current count
+    const currentCount = appState.scanCounts.get(code) || 0;
+    const newCount = currentCount + 1;
+    
+    if (scanMode === 'unique' && appState.scannedSet.has(code)) {
+      // Unique mode - show already scanned
+      entry.remarkCell.textContent = `✅ Already scanned (${currentCount}x)`;
+      showStatus(elements.scanStatus, `⚠ Already scanned: ${code} (${currentCount} times total)`, "warning");
       return;
     }
 
-    appState.scannedSet.add(code);
-    entry.checkbox.checked = true;
-    entry.row.classList.add("scanned");
-    entry.remarkCell.textContent = `✅ Scanned at ${new Date().toLocaleTimeString()}`;
-    appState.scannedCount++;
+    // Update counts
+    appState.scanCounts.set(code, newCount);
+    
+    // Mark as scanned if first time
+    if (!appState.scannedSet.has(code)) {
+      appState.scannedSet.add(code);
+      appState.scannedCount++;
+      entry.checkbox.checked = true;
+      entry.row.classList.add("scanned");
+    }
 
+    // Update display
+    entry.countCell.textContent = `${newCount}x`;
+    entry.remarkCell.textContent = `✅ Scanned ${newCount}x (Last: ${timestamp})`;
+    
     updateCounter();
-    showStatus(elements.scanStatus, `✅ Matched: ${code}`, "success");
+    showStatus(elements.scanStatus, `✅ ${code} - Scan #${newCount}`, "success");
     updateSummaryBreakdown();
   };
 
@@ -580,6 +712,13 @@
     }
   });
 
+  // Toggle mode functionality
+  elements.scanModeToggle.addEventListener("change", () => {
+    const isMultiple = elements.scanModeToggle.checked;
+    elements.scanModeLabel.textContent = isMultiple ? "Multiple" : "Single";
+    elements.scanModeLabel.style.color = isMultiple ? "#2f855a" : "#4a5568";
+  });
+
   // Manual entry
   elements.manualBtn.addEventListener("click", () => {
     elements.manualInput.value = "";
@@ -613,10 +752,12 @@
   elements.confirmYes.addEventListener("click", () => {
     appState.scannedSet.clear();
     appState.scannedCount = 0;
+    appState.scanCounts.clear();
     appState.plRowMap.forEach((entry) => {
       entry.checkbox.checked = false;
       entry.row.classList.remove("scanned");
       entry.remarkCell.textContent = "❌ Not Scanned";
+      entry.countCell.textContent = "-";
     });
     appState.unmatchedList = [];
     renderUnmatched();
@@ -666,22 +807,23 @@
     }
 
     try {
-      let rows = [["PL Code", "Status", "Timestamp", "Index"]];
+      let rows = [["PL Code", "Status", "Scan Count", "Timestamp", "Index"]];
 
       appState.uniquePLs.forEach((pl, index) => {
         const norm = normalize(pl);
         const entry = appState.plRowMap.get(norm);
+        const scanCount = appState.scanCounts.get(norm) || 0;
         let status = "❌ Not Scanned";
         let timestamp = "";
 
         if (appState.scannedSet.has(norm)) {
           status = "✅ Scanned";
           const text = entry?.remarkCell?.textContent || "";
-          const match = text.match(/at (.+)$/);
+          const match = text.match(/Last: (.+)\)$/);
           if (match) timestamp = match[1];
         }
 
-        rows.push([pl, status, timestamp, index + 1]);
+        rows.push([pl, status, scanCount, timestamp, index + 1]);
       });
 
       // Add unmatched entries
@@ -689,7 +831,17 @@
         rows.push([]);
         rows.push(["=== UNMATCHED ENTRIES ==="]);
         appState.unmatchedList.forEach(u => {
-          rows.push([u.code, `⚠️ Unmatched (${u.source})`, u.time, ""]);
+          rows.push([u.code, `⚠️ Unmatched (${u.source})`, "", u.time, ""]);
+        });
+      }
+
+      // Add scan history
+      if (appState.scanHistory.length > 0) {
+        rows.push([]);
+        rows.push(["=== SCAN HISTORY ==="]);
+        rows.push(["PL Code", "Source", "Time", "Original", "Scan #"]);
+        appState.scanHistory.forEach((scan, index) => {
+          rows.push([scan.code, scan.source, scan.time, scan.original || "", index + 1]);
         });
       }
 
@@ -699,11 +851,13 @@
         "SUMMARY",
         `Total: ${appState.uniquePLs.length}`,
         `✅ Scanned: ${appState.scannedSet.size}`,
-        `❌ Missing: ${appState.uniquePLs.length - appState.scannedSet.size}`
+        `❌ Missing: ${appState.uniquePLs.length - appState.scannedSet.size}`,
+        ""
       ]);
       rows.push([
         "",
         `⚠ Unmatched: ${appState.unmatchedList.length}`,
+        `📜 Total Scans: ${appState.scanHistory.length}`,
         `Generated: ${new Date().toLocaleString()}`,
         ""
       ]);
@@ -797,6 +951,8 @@
       appState.scannedSet.clear();
       appState.scannedCount = 0;
       appState.unmatchedList = [];
+      appState.scanCounts.clear(); // Reset scan counts
+      appState.scanHistory = []; // Reset scan history
       appState.currentFilter = 'all';
       appState.searchTerm = '';
       elements.searchInput.value = '';
@@ -857,6 +1013,27 @@
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       elements.barcodeInput.focus();
+    }
+  });
+
+  // History controls
+  elements.showHistoryBtn.addEventListener("click", () => {
+    const isVisible = elements.historyContainer.style.display !== 'none';
+    if (isVisible) {
+      elements.historyContainer.style.display = 'none';
+      elements.showHistoryBtn.textContent = 'Show History';
+    } else {
+      renderHistory();
+      elements.historyContainer.style.display = 'block';
+      elements.showHistoryBtn.textContent = 'Hide History';
+    }
+  });
+
+  elements.clearHistoryBtn.addEventListener("click", () => {
+    if (confirm('Clear all scan history? This cannot be undone.')) {
+      appState.scanHistory = [];
+      renderHistory();
+      showStatus(elements.scanStatus, "🗑️ Scan history cleared", "info");
     }
   });
 

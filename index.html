@@ -1,1096 +1,1626 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>PL Code Scanner</title>
-
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" onerror="console.warn('PDF.js failed to load')"></script>
-  <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js" onerror="console.warn('Tesseract.js failed to load')"></script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>PL Extractor</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" onerror="console.warn('PDF.js failed')"></script>
+  <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js" onerror="console.warn('Tesseract failed')"></script>
 
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: Inter, system-ui, -apple-system, sans-serif; background:#f8fafc; margin:0; padding:0; }
-    .container { max-width:100vw; padding:12px; }
-    .card { background:#fff; border-radius:16px; padding:16px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
-    .card h2 { margin:0 0 16px 0; font-size:1.25rem; font-weight:600; color:#1a202c; }
-    .btn { background:#3182ce; color:#fff; border:0; padding:14px 20px; border-radius:12px; font-weight:600; font-size:16px; cursor:pointer; min-height:48px; width:100%; margin-bottom:8px; transition: all 0.2s ease; }
-    .btn:hover:not(:disabled) { background:#2c5282; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3); }
-    .btn:active:not(:disabled) { transform: scale(0.98); }
-    .btn:disabled { background:#a0aec0; cursor:not-allowed; transform:none; }
-    .btn-secondary { background:#718096; }
-    .btn-secondary:hover:not(:disabled) { background:#4a5568; }
-    .btn-danger { background:#e53e3e; }
-    .btn-danger:hover:not(:disabled) { background:#c53030; }
-    .status { padding:12px 16px; border-radius:8px; font-weight:500; margin:8px 0; text-align:center; transition: all 0.3s ease; }
-    .status.info { background:#ebf8ff; color:#2c5aa0; border-left:4px solid #3182ce; }
-    .status.success { background:#f0fff4; color:#2f855a; border-left:4px solid #38a169; }
-    .status.error { background:#fed7d7; color:#c53030; border-left:4px solid #e53e3e; }
-    .status.warning { background:#fef5e7; color:#d69e2e; border-left:4px solid #d69e2e; }
-    .last-scan { background:#f7fafc; padding:12px; border-radius:8px; margin:8px 0; font-family:monospace; font-size:14px; border-left:4px solid #3182ce; animation: fadeIn 0.3s ease; }
-    .table-container { overflow-x:auto; border-radius:8px; border:1px solid #e2e8f0; background:#fff; max-height:400px; overflow-y:auto; }
-    table { width:100%; border-collapse:collapse; min-width:400px; }
-    thead th { background:#f7fafc; padding:12px 8px; border-bottom:2px solid #e2e8f0; text-align:left; font-weight:600; font-size:14px; position:sticky; top:0; z-index:10; }
-    tbody td { padding:14px 8px; border-bottom:1px solid #f1f5f9; font-size:14px; }
-    .scanned { background:#f0fff4 !important; animation: highlightScan 0.5s ease; }
-    .counter { display:block; padding:16px; border-radius:12px; font-weight:700; font-size:18px; text-align:center; margin-bottom:16px; transition: all 0.3s ease; }
-    .counter.pending { background:#fed7d7; color:#c53030; }
-    .counter.success { background:#c6f6d5; color:#2f855a; }
-    .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
-    .modal.hidden { display: none; }
-    .modal-content { max-width: 400px; width: 90%; text-align: center; animation: modalSlide 0.3s ease; }
-    .modal-content h2 { font-size: 1.25rem; margin-bottom: 12px; color: #c53030; }
-    .file-input { width:100%; padding:12px; margin-bottom:12px; border:2px dashed #cbd5e0; border-radius:8px; text-align:center; cursor:pointer; transition: all 0.2s ease; }
-    .file-input:hover { border-color:#3182ce; background:#f7fafc; }
-    .file-input.drag-over { border-color:#38a169; background:#f0fff4; }
-    .progress-bar { width:100%; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; margin:8px 0; }
-    .progress-fill { height:100%; background:#3182ce; transition: width 0.3s ease; }
-    .search-box { width:100%; padding:12px; font-size:16px; border-radius:8px; border:1px solid #cbd5e0; margin-bottom:12px; }
-    .search-box:focus { outline:none; border-color:#3182ce; box-shadow:0 0 0 3px rgba(49, 130, 206, 0.1); }
-    
-    /* Toggle Switch Styles */
-    .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-    .toggle-switch input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e0; transition: .3s; border-radius: 24px; }
-    .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
-    input:checked + .toggle-slider { background-color: #3182ce; }
-    input:checked + .toggle-slider:before { transform: translateX(20px); }
-    
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes highlightScan { 0% { background:#c6f6d5 !important; transform: scale(1.02); } 100% { background:#f0fff4 !important; transform: scale(1); } }
-    @keyframes modalSlide { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-    
-    @media (max-width: 768px) {
-      .container { padding: 8px; }
-      .card { padding: 12px; margin-bottom: 12px; }
-      .btn { padding: 12px 16px; font-size: 15px; }
-      thead th, tbody td { padding: 10px 6px; font-size: 13px; }
+    :root {
+      --bg:        #0f1117;
+      --surface:   #181c27;
+      --surface2:  #1f2535;
+      --border:    #2a3045;
+      --border2:   #374060;
+      --accent:    #4f8ef7;
+      --accent-dim:#2d5db0;
+      --success:   #22c55e;
+      --warn:      #f59e0b;
+      --danger:    #ef4444;
+      --text:      #e8ecf4;
+      --text-dim:  #8892aa;
+      --text-muted:#4a5470;
+      --mono:      'JetBrains Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+      --radius:    12px;
+      --radius-sm: 8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .app-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .app-logo-icon {
+      width: 32px; height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .app-logo h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .app-logo span {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+    .offline-badge {
+      display: none;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(239,68,68,0.15);
+      color: var(--danger);
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .offline-badge.visible { display: flex; align-items: center; gap: 4px; }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .card-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-title-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    /* ── Drop Zone ── */
+    .drop-zone {
+      border: 2px dashed var(--border2);
+      border-radius: var(--radius);
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--surface2);
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(79,142,247,0.06);
+    }
+    .drop-zone input { display: none; }
+    .drop-zone-icon { font-size: 28px; margin-bottom: 8px; line-height: 1; }
+    .drop-zone-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .drop-zone-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .file-list {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .file-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(79,142,247,0.1);
+      border: 1px solid rgba(79,142,247,0.2);
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-family: var(--mono);
+      color: var(--accent);
+    }
+    .file-chip span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Progress ── */
+    .progress-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 10px 0;
+      display: none;
+    }
+    .progress-track.visible { display: block; }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #7cb9ff);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 16px;
+      border-radius: var(--radius-sm);
+      font-family: var(--sans);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+      min-height: 44px;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      width: 100%;
+    }
+    .btn-primary:hover:not(:disabled) { background: #5f9ef8; }
+    .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border2);
+      flex: 1;
+    }
+    .btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .btn-danger {
+      background: rgba(239,68,68,0.12);
+      color: var(--danger);
+      border: 1px solid rgba(239,68,68,0.2);
+      flex: 1;
+    }
+    .btn-danger:hover:not(:disabled) { background: rgba(239,68,68,0.2); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      flex: 1;
+    }
+    .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--border2); }
+    .btn-row { display: flex; gap: 8px; }
+
+    /* ── Status ── */
+    .status {
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 0.84rem;
+      font-weight: 500;
+      margin: 8px 0;
+      border-left: 3px solid;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status:empty { display: none; }
+    .status.info    { background: rgba(79,142,247,0.1);  border-color: var(--accent);   color: #93c5fd; }
+    .status.success { background: rgba(34,197,94,0.1);   border-color: var(--success);  color: #86efac; }
+    .status.error   { background: rgba(239,68,68,0.1);   border-color: var(--danger);   color: #fca5a5; }
+    .status.warning { background: rgba(245,158,11,0.1);  border-color: var(--warn);     color: #fcd34d; }
+
+    /* ── Summary Cards ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .summary-stat {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 10px;
+      text-align: center;
+    }
+    .summary-stat .val {
+      font-family: var(--mono);
+      font-size: 1.4rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .summary-stat .lbl {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    .stat-total .val  { color: var(--text); }
+    .stat-scanned .val { color: var(--success); }
+    .stat-missing .val { color: var(--danger); }
+    .stat-unmatched .val { color: var(--warn); }
+
+    /* Progress ring */
+    .progress-ring-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 0 4px;
+      gap: 6px;
+    }
+    .progress-ring-label {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+    .ring-svg { display: block; }
+    .ring-bg { fill: none; stroke: var(--border); }
+    .ring-fg { fill: none; stroke: var(--success); stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+    .ring-text-pct {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 700;
+      fill: var(--text);
+    }
+    .ring-text-sub {
+      font-family: var(--sans);
+      font-size: 5.5px;
+      fill: var(--text-muted);
+    }
+
+    /* ── Scanner Input ── */
+    .scan-input-wrap {
+      position: relative;
+      margin-bottom: 8px;
+    }
+    .scan-input {
+      width: 100%;
+      padding: 12px 44px 12px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .scan-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,142,247,0.15); }
+    .scan-input::placeholder { color: var(--text-muted); font-family: var(--sans); }
+    .scan-input-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 16px;
+      pointer-events: none;
+    }
+    .scan-mode-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+    }
+    .scan-mode-row span {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+    .mode-pills {
+      display: flex;
+      gap: 4px;
+    }
+    .mode-pill {
+      font-size: 0.73rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .mode-pill.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Last scan chip */
+    .last-scan-chip {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(79,142,247,0.08);
+      border: 1px solid rgba(79,142,247,0.2);
+      border-radius: var(--radius-sm);
+      margin-top: 8px;
+      font-size: 0.78rem;
+    }
+    .last-scan-chip.visible { display: flex; }
+    .last-scan-chip .badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--accent);
+      color: #fff;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .last-scan-chip .code {
+      font-family: var(--mono);
+      color: var(--text);
+      font-size: 0.82rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .last-scan-chip .time { color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+
+    /* ── Search & Filter ── */
+    .search-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .search-input {
+      flex: 1;
+      padding: 9px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.84rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--text-muted); }
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .filter-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .filter-pill .count {
+      font-size: 0.68rem;
+      background: var(--border);
+      padding: 1px 5px;
+      border-radius: 10px;
+      color: var(--text-dim);
+    }
+    .filter-pill.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .filter-pill.active .count {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+    }
+    .filter-pill.f-scanned.active { background: var(--success); border-color: var(--success); }
+    .filter-pill.f-pending.active { background: var(--danger);  border-color: var(--danger); }
+
+    /* ── Table ── */
+    .table-wrap {
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      max-height: 420px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border2) transparent;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 380px;
+    }
+    thead th {
+      background: var(--surface2);
+      padding: 10px 10px;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td {
+      padding: 10px 10px;
+      font-size: 0.82rem;
+      vertical-align: middle;
+    }
+    .td-idx { color: var(--text-muted); font-size: 0.72rem; width: 36px; }
+    .td-check { width: 36px; text-align: center; }
+    .td-code { font-family: var(--mono); font-size: 0.8rem; color: var(--text); }
+    .td-status { width: 130px; }
+    .td-count { width: 52px; text-align: center; font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+    .badge-scanned {
+      background: rgba(34,197,94,0.12);
+      color: #4ade80;
+      border: 1px solid rgba(34,197,94,0.2);
+    }
+    .badge-pending {
+      background: rgba(239,68,68,0.1);
+      color: #f87171;
+      border: 1px solid rgba(239,68,68,0.15);
+    }
+
+    tr.scanned td { background: rgba(34,197,94,0.04); }
+    @keyframes flashRow {
+      0%   { background: rgba(34,197,94,0.25); }
+      100% { background: rgba(34,197,94,0.04); }
+    }
+    tr.flash-in td { animation: flashRow 0.6s ease forwards; }
+
+    .mpl-group-header td {
+      background: var(--surface2) !important;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 6px 10px;
+      border-top: 1px solid var(--border);
+    }
+    .mpl-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(79,142,247,0.1);
+      color: var(--accent);
+      border: 1px solid rgba(79,142,247,0.2);
+    }
+
+    .empty-cell {
+      text-align: center;
+      padding: 40px 20px !important;
+      color: var(--text-muted);
+      font-size: 0.84rem;
+    }
+    .empty-cell svg { display: block; margin: 0 auto 10px; opacity: 0.3; }
+
+    tfoot td {
+      padding: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--surface2);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Custom checkbox */
+    input[type="checkbox"] {
+      width: 17px; height: 17px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* ── Unmatched & History ── */
+    .collapsible-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .collapsible-toggle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .collapsible-toggle:hover { color: var(--text); border-color: var(--border2); }
+    .collapsible-body {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.35s ease;
+    }
+    .collapsible-body.open { max-height: 400px; }
+    .collapsible-inner { padding-top: 12px; }
+
+    /* ── Modals ── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .modal-backdrop.hidden { display: none; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 360px;
+      animation: modalIn 0.2s ease;
+    }
+    @keyframes modalIn {
+      from { opacity:0; transform: translateY(-16px) scale(0.97); }
+      to   { opacity:1; transform: translateY(0) scale(1); }
+    }
+    .modal h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .modal p {
+      font-size: 0.84rem;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+    .modal-input {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      outline: none;
+      margin-bottom: 12px;
+      transition: border-color 0.2s;
+    }
+    .modal-input:focus { border-color: var(--accent); }
+    .modal-input::placeholder { color: var(--text-muted); font-family: var(--sans); }
+
+    /* ── Download Summary Panel ── */
+    .summary-detail {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      margin: 12px 0 8px;
+      padding: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+    .summary-detail.visible { display: flex; }
+    .summary-row { display: flex; justify-content: space-between; align-items: center; }
+    .summary-row .k { color: var(--text-muted); }
+    .summary-row .v { font-family: var(--mono); font-weight: 600; color: var(--text); }
+    .summary-row .v.green { color: var(--success); }
+    .summary-row .v.red   { color: var(--danger); }
+    .summary-row .v.amber { color: var(--warn); }
+    .summary-divider { height: 1px; background: var(--border); margin: 2px 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .app-logo span { display: none; }
+    }
+    @media (min-width: 640px) {
+      .container { padding: 20px; gap: 16px; }
+      .card { padding: 20px; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- File Upload -->
-    <div class="card">
-      <h2>📄 Upload Files</h2>
-      <div class="file-input" id="fileDropZone">
-        <input id="fileInput" type="file" accept="application/pdf,image/*" multiple style="display:none;" />
-        📁 Click to select files or drag & drop here
-        <br><small>Supports PDF and images (PNG, JPG, etc.)</small>
-      </div>
-      <button id="extractBtn" class="btn">🔍 Extract PL Codes</button>
-      <div class="progress-bar hidden" id="progressBar">
-        <div class="progress-fill" id="progressFill"></div>
-      </div>
-      <div id="extractStatus"></div>
+
+<!-- Header -->
+<header class="app-header">
+  <div class="app-logo">
+    <div class="app-logo-icon">🔍</div>
+    <div>
+      <h1>PL Extractor</h1>
+      <span>MPL Picking List Scanner</span>
+    </div>
+  </div>
+  <div id="offlineBadge" class="offline-badge">
+    <span>⚡</span> Offline
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ① Upload -->
+  <div class="card">
+    <div class="card-title"><span class="card-title-dot"></span> Extract PL Codes</div>
+
+    <div class="drop-zone" id="dropZone">
+      <input id="fileInput" type="file" accept="application/pdf,image/*" multiple/>
+      <div class="drop-zone-icon">📂</div>
+      <div class="drop-zone-title">Drop PDF / image files here</div>
+      <div class="drop-zone-hint">or tap to browse · PDF, PNG, JPG, BMP</div>
+      <div class="file-list" id="fileList"></div>
     </div>
 
-    <!-- Breakdown Summary -->
-    <div id="summaryBreakdown" class="card" style="text-align:center; font-weight:600; font-size:16px; padding:12px; color:#2d3748;">
-      No data loaded
+    <div style="margin-top:10px;">
+      <button id="extractBtn" class="btn btn-primary">🔍 Extract PL Codes</button>
     </div>
 
-    <!-- Scanner -->
-    <div class="card">
-      <h2>📱 Barcode Scanner</h2>
-      <div style="display:flex; gap:12px; margin-bottom:12px;">
-        <input id="barcodeInput" class="search-box" type="text" placeholder="Scan barcode here..." autofocus style="flex:1;" />
-        <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; background:#f7fafc; border-radius:8px; border:1px solid #cbd5e0; min-width:140px;">
-          <span id="scanModeLabel" style="font-size:14px; font-weight:500; color:#4a5568;">Single</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="scanModeToggle">
-            <span class="toggle-slider"></span>
-          </label>
+    <div class="progress-track" id="progressTrack">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div id="extractStatus" class="status"></div>
+  </div>
+
+  <!-- ② Summary Dashboard -->
+  <div class="card" id="summaryCard">
+    <div class="card-title"><span class="card-title-dot"></span> Session Summary</div>
+
+    <div class="summary-grid">
+      <div class="summary-stat stat-total">
+        <div class="val" id="statTotal">0</div>
+        <div class="lbl">Total PLs</div>
+      </div>
+      <div class="summary-stat stat-scanned">
+        <div class="val" id="statScanned">0</div>
+        <div class="lbl">Scanned</div>
+      </div>
+      <div class="summary-stat stat-missing">
+        <div class="val" id="statMissing">0</div>
+        <div class="lbl">Missing</div>
+      </div>
+      <div class="summary-stat stat-unmatched">
+        <div class="val" id="statUnmatched">0</div>
+        <div class="lbl">Unmatched</div>
+      </div>
+    </div>
+
+    <div class="progress-ring-wrap">
+      <svg class="ring-svg" width="88" height="88" viewBox="0 0 88 88">
+        <circle class="ring-bg" cx="44" cy="44" r="36" stroke-width="7"/>
+        <circle class="ring-fg" id="ringFg" cx="44" cy="44" r="36" stroke-width="7"
+          stroke-dasharray="226.2" stroke-dashoffset="226.2"
+          transform="rotate(-90 44 44)"/>
+        <text class="ring-text-pct" x="44" y="47" text-anchor="middle" dominant-baseline="middle" id="ringPct">0%</text>
+        <text class="ring-text-sub" x="44" y="57" text-anchor="middle" id="ringLabel">complete</text>
+      </svg>
+      <div class="progress-ring-label" id="ringStatus">No data loaded</div>
+    </div>
+
+    <!-- Expandable detailed breakdown -->
+    <div class="summary-detail" id="summaryDetail">
+      <div class="summary-row"><span class="k">MPL Groups</span><span class="v" id="detailMPL">—</span></div>
+      <div class="summary-divider"></div>
+      <div class="summary-row"><span class="k">Total Scans (incl. duplicates)</span><span class="v" id="detailTotalScans">0</span></div>
+      <div class="summary-row"><span class="k">Avg scans per code</span><span class="v" id="detailAvg">—</span></div>
+      <div class="summary-row"><span class="k">Most scanned code</span><span class="v" id="detailMost">—</span></div>
+      <div class="summary-divider"></div>
+      <div class="summary-row"><span class="k">Session started</span><span class="v" id="detailStart">—</span></div>
+      <div class="summary-row"><span class="k">Last activity</span><span class="v" id="detailLast">—</span></div>
+    </div>
+  </div>
+
+  <!-- ③ Scanner -->
+  <div class="card">
+    <div class="card-title"><span class="card-title-dot"></span> Barcode Scanner</div>
+
+    <div class="scan-input-wrap">
+      <input id="barcodeInput" class="scan-input" type="text" placeholder="Scan or type PL code, press Enter…" autocomplete="off" autocorrect="off" spellcheck="false"/>
+      <span class="scan-input-icon">⌨</span>
+    </div>
+
+    <div class="scan-mode-row">
+      <span>Scan Mode</span>
+      <div class="mode-pills">
+        <button class="mode-pill active" data-mode="unique">Single</button>
+        <button class="mode-pill" data-mode="multiple">Multi</button>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-bottom:8px;">
+      <button id="manualBtn"  class="btn btn-ghost">✍️ Manual</button>
+      <button id="clearBtn"   class="btn btn-danger" disabled>🧹 Clear All</button>
+    </div>
+
+    <div id="scanStatus" class="status info">Upload files first, then scan codes</div>
+    <div class="last-scan-chip" id="lastScanChip">
+      <span class="badge">LAST</span>
+      <span class="code" id="lastScanCode">—</span>
+      <span class="time" id="lastScanTime">—</span>
+    </div>
+  </div>
+
+  <!-- ④ PL Table -->
+  <div class="card">
+    <div class="card-title"><span class="card-title-dot"></span> PL Code List</div>
+
+    <div class="search-row">
+      <input id="searchInput" class="search-input" type="text" placeholder="🔍 Search PL codes or MPL…"/>
+    </div>
+
+    <div class="filter-pills">
+      <button class="filter-pill active" data-filter="all">All <span class="count" id="fpAll">0</span></button>
+      <button class="filter-pill f-scanned" data-filter="scanned">✅ Scanned <span class="count" id="fpScanned">0</span></button>
+      <button class="filter-pill f-pending" data-filter="pending">❌ Pending <span class="count" id="fpPending">0</span></button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="plTable">
+        <thead>
+          <tr>
+            <th class="td-idx">#</th>
+            <th class="td-check">✓</th>
+            <th class="td-code">PL Code</th>
+            <th class="td-count">×</th>
+            <th class="td-status">Status</th>
+          </tr>
+        </thead>
+        <tbody id="plTbody">
+          <tr><td class="empty-cell" colspan="5">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Upload files to extract PL codes
+          </td></tr>
+        </tbody>
+        <tfoot><tr><td colspan="5" id="totalCell">Total: 0 codes</td></tr></tfoot>
+      </table>
+    </div>
+
+    <div style="margin-top:12px;">
+      <button id="downloadBtn" class="btn btn-primary">⬇️ Download CSV Report</button>
+    </div>
+  </div>
+
+  <!-- ⑤ Unmatched -->
+  <div class="card">
+    <div class="collapsible-header" id="unmatchedHeader">
+      <div class="card-title" style="margin:0"><span class="card-title-dot" style="background:var(--warn)"></span> Unmatched Scans <span id="unmatchedBadge" style="margin-left:6px; font-family:var(--mono); font-size:0.8rem; color:var(--warn);">0</span></div>
+      <button class="collapsible-toggle" id="unmatchedToggle">Show</button>
+    </div>
+    <div class="collapsible-body" id="unmatchedBody">
+      <div class="collapsible-inner">
+        <div class="table-wrap">
+          <table id="unmatchedTable">
+            <thead><tr>
+              <th>#</th><th>Code</th><th>Reason</th><th>Time</th><th></th>
+            </tr></thead>
+            <tbody id="unmatchedTbody">
+              <tr><td class="empty-cell" colspan="5">No unmatched codes yet</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
-      <div style="display:flex; gap:12px; margin-bottom:12px;">
-        <button id="clearBtn" class="btn btn-secondary" disabled>🧹 Clear All</button>
-        <button id="manualBtn" class="btn btn-secondary">✍️ Manual Entry</button>
-      </div>
-      <div id="scanStatus" class="status info">Scanner ready - upload files first</div>
-      <div id="lastScan" class="last-scan hidden"></div>
     </div>
+  </div>
 
-    <!-- Search and Filter -->
-    <div class="card">
-      <input id="searchInput" class="search-box" type="text" placeholder="🔍 Search PL codes..." />
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button id="filterAll" class="btn btn-secondary" style="width:auto; padding:8px 16px;">All</button>
-        <button id="filterScanned" class="btn btn-secondary" style="width:auto; padding:8px 16px;">✅ Scanned</button>
-        <button id="filterPending" class="btn btn-secondary" style="width:auto; padding:8px 16px;">❌ Pending</button>
+  <!-- ⑥ Scan History -->
+  <div class="card">
+    <div class="collapsible-header">
+      <div class="card-title" style="margin:0"><span class="card-title-dot" style="background:var(--text-muted)"></span> Scan History <span id="historyBadge" style="margin-left:6px; font-family:var(--mono); font-size:0.8rem; color:var(--text-muted);">0</span></div>
+      <div style="display:flex;gap:6px;">
+        <button class="collapsible-toggle" id="historyToggle">Show</button>
+        <button class="collapsible-toggle" id="clearHistoryBtn" style="color:var(--danger); border-color:rgba(239,68,68,0.3);">Clear</button>
       </div>
     </div>
-
-    <!-- Extracted Results -->
-    <div class="card">
-      <div id="counter" class="counter pending">No codes loaded</div>
-      <div class="table-container">
-        <table id="plTable">
-          <thead><tr><th>#</th><th>✓</th><th>PL Code</th><th>Count</th><th>Status</th></tr></thead>
-          <tbody><tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">Upload files to see PL codes here</td></tr></tbody>
-          <tfoot><tr><td colspan="5" id="totalCell">Total: 0 codes</td></tr></tfoot>
-        </table>
-      </div>
-      <div style="margin-top:16px;">
-        <button id="downloadBtn" class="btn">⬇️ Download Summary</button>
-      </div>
-    </div>
-
-    <!-- Unmatched Entries -->
-    <div class="card">
-      <h2>⚠️ Unmatched Entries</h2>
-      <div class="table-container">
-        <table id="unmatchedTable">
-          <thead><tr><th>#</th><th>Code</th><th>Source</th><th>Timestamp</th><th>Action</th></tr></thead>
-          <tbody><tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">No unmatched codes</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Scan History -->
-    <div class="card">
-      <h2>📜 Scan History</h2>
-      <div style="display:flex; gap:12px; margin-bottom:12px;">
-        <button id="showHistoryBtn" class="btn btn-secondary" style="width:auto; padding:8px 16px;">Show History</button>
-        <button id="clearHistoryBtn" class="btn btn-danger" style="width:auto; padding:8px 16px;">Clear History</button>
-      </div>
-      <div class="table-container" id="historyContainer" style="display:none; max-height:300px;">
-        <table id="historyTable">
-          <thead><tr><th>#</th><th>PL Code</th><th>Source</th><th>Time</th></tr></thead>
-          <tbody></tbody>
-        </table>
+    <div class="collapsible-body" id="historyBody">
+      <div class="collapsible-inner">
+        <div class="table-wrap" style="max-height:280px;">
+          <table id="historyTable">
+            <thead><tr><th>#</th><th>PL Code</th><th>Source</th><th>Time</th></tr></thead>
+            <tbody id="historyTbody">
+              <tr><td class="empty-cell" colspan="4">No scan history</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Confirm Modal -->
-  <div id="confirmModal" class="modal hidden">
-    <div class="modal-content card">
-      <h2>⚠ Confirm Action</h2>
-      <p>Are you sure you want to clear all scanned marks?</p>
-      <div style="display:flex; gap:12px; margin-top:16px;">
-        <button id="confirmYes" class="btn btn-danger">Yes, Clear All</button>
-        <button id="confirmNo" class="btn btn-secondary">Cancel</button>
-      </div>
-    </div>
-  </div>
+</div><!-- /container -->
 
-  <!-- Manual Entry Modal -->
-  <div id="manualModal" class="modal hidden">
-    <div class="modal-content card">
-      <h2>✍️ Manual Entry</h2>
-      <p>Enter PL code manually:</p>
-      <input id="manualInput" class="search-box" type="text" placeholder="P12AB1234567" />
-      <div style="display:flex; gap:12px;">
-        <button id="manualSubmit" class="btn">Add</button>
-        <button id="manualCancel" class="btn btn-secondary">Cancel</button>
-      </div>
+<!-- Modals -->
+<div class="modal-backdrop hidden" id="confirmModal">
+  <div class="modal">
+    <h3>⚠️ Clear All Scans?</h3>
+    <p>This will reset all scan marks and counts. The PL code list will remain. This cannot be undone.</p>
+    <div class="btn-row">
+      <button id="confirmYes" class="btn btn-danger" style="flex:1;">Yes, Clear</button>
+      <button id="confirmNo"  class="btn btn-secondary" style="flex:1;">Cancel</button>
     </div>
   </div>
+</div>
+
+<div class="modal-backdrop hidden" id="manualModal">
+  <div class="modal">
+    <h3>✍️ Manual Entry</h3>
+    <p>Type a PL code to mark it as scanned.</p>
+    <input id="manualInput" class="modal-input" type="text" placeholder="e.g. P12AB1234567" autocomplete="off" autocorrect="off" spellcheck="false"/>
+    <div class="btn-row">
+      <button id="manualSubmit" class="btn btn-primary" style="flex:1;">Submit</button>
+      <button id="manualCancel" class="btn btn-secondary" style="flex:1;">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <script>
-  // Constants and Configuration
-  const PL_CANON = /^P\d{2}[A-Z]{2}\d{7}$/;
-  const PL_FLEX_GLOBAL = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/gi;
-  const PL_FLEX = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/i;
-  const PL_X_MIN = 700, PL_X_MAX = 790;
-  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
-  const DEBOUNCE_DELAY = 300;
+// ─── Constants ────────────────────────────────────────────────────────────────
+const PL_CANON       = /^P\d{2}[A-Z]{2}\d{7}$/;
+const PL_FLEX_GLOBAL = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/gi;
+const PL_FLEX        = /P\s*\d{2}\s*[A-Za-z]{2}\s*\d{6,8}/i;
+const PL_X_MIN = 700, PL_X_MAX = 790;
+const MAX_FILE_SIZE  = 50 * 1024 * 1024;
+const DEBOUNCE_MS    = 280;
 
-  // DOM Elements
-  const elements = {
-    fileInput: document.getElementById("fileInput"),
-    fileDropZone: document.getElementById("fileDropZone"),
-    extractBtn: document.getElementById("extractBtn"),
-    extractStatus: document.getElementById("extractStatus"),
-    progressBar: document.getElementById("progressBar"),
-    progressFill: document.getElementById("progressFill"),
-    barcodeInput: document.getElementById("barcodeInput"),
-    scanModeToggle: document.getElementById("scanModeToggle"),
-    scanModeLabel: document.getElementById("scanModeLabel"),
-    scanStatus: document.getElementById("scanStatus"),
-    lastScan: document.getElementById("lastScan"),
-    tableBody: document.querySelector("#plTable tbody"),
-    totalCell: document.getElementById("totalCell"),
-    counterEl: document.getElementById("counter"),
-    clearBtn: document.getElementById("clearBtn"),
-    confirmModal: document.getElementById("confirmModal"),
-    confirmYes: document.getElementById("confirmYes"),
-    confirmNo: document.getElementById("confirmNo"),
-    manualBtn: document.getElementById("manualBtn"),
-    manualModal: document.getElementById("manualModal"),
-    manualInput: document.getElementById("manualInput"),
-    manualSubmit: document.getElementById("manualSubmit"),
-    manualCancel: document.getElementById("manualCancel"),
-    downloadBtn: document.getElementById("downloadBtn"),
-    unmatchedTable: document.getElementById("unmatchedTable").querySelector("tbody"),
-    summaryBreakdown: document.getElementById("summaryBreakdown"),
-    searchInput: document.getElementById("searchInput"),
-    filterAll: document.getElementById("filterAll"),
-    filterScanned: document.getElementById("filterScanned"),
-    filterPending: document.getElementById("filterPending"),
-    showHistoryBtn: document.getElementById("showHistoryBtn"),
-    clearHistoryBtn: document.getElementById("clearHistoryBtn"),
-    historyContainer: document.getElementById("historyContainer"),
-    historyTable: document.getElementById("historyTable").querySelector("tbody")
-  };
+// ─── State ────────────────────────────────────────────────────────────────────
+const S = {
+  PLs:          [],          // all unique PL codes
+  scanned:      new Set(),   // normalized codes
+  scanCounts:   new Map(),   // code → count
+  scanHistory:  [],          // [{code, source, time}]
+  unmatched:    [],          // [{code, reason, time}]
+  rowMap:       new Map(),   // code → {row, cb, countCell, statusCell}
+  scanMode:     'unique',    // 'unique' | 'multiple'
+  filter:       'all',
+  search:       '',
+  processing:   false,
+  sessionStart: null,
+  lastActivity: null,
+};
 
-  // Application State
-  let appState = {
-    uniquePLs: [],
-    plRowMap: new Map(),
-    scannedSet: new Set(),
-    scannedCount: 0,
-    unmatchedList: [],
-    currentFilter: 'all',
-    searchTerm: '',
-    isProcessing: false,
-    scanCounts: new Map(), // Track multiple scans per PL
-    scanHistory: [] // Complete scan history
-  };
+// ─── DOM ──────────────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const $$ = sel => document.querySelectorAll(sel);
 
-  // Utility Functions
-  const normalize = (s) => (s || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-  
-  // Extract MPL from PL code (first 4 characters: P + 2 digits + 2 letters)
-  const extractMPL = (plCode) => {
-    if (!plCode || plCode.length < 4) return '';
-    return plCode.substring(0, 4); // P12AB from P12AB1234567
-  };
-  
-  const debounce = (func, delay) => {
-    let timeoutId;
-    return (...args) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func.apply(null, args), delay);
-    };
-  };
+const el = {
+  dropZone:     $('dropZone'),
+  fileInput:    $('fileInput'),
+  fileList:     $('fileList'),
+  extractBtn:   $('extractBtn'),
+  extractStatus:$('extractStatus'),
+  progressTrack:$('progressTrack'),
+  progressFill: $('progressFill'),
+  barcodeInput: $('barcodeInput'),
+  scanStatus:   $('scanStatus'),
+  lastScanChip: $('lastScanChip'),
+  lastScanCode: $('lastScanCode'),
+  lastScanTime: $('lastScanTime'),
+  plTbody:      $('plTbody'),
+  totalCell:    $('totalCell'),
+  searchInput:  $('searchInput'),
+  downloadBtn:  $('downloadBtn'),
+  clearBtn:     $('clearBtn'),
+  manualBtn:    $('manualBtn'),
+  confirmModal: $('confirmModal'),
+  confirmYes:   $('confirmYes'),
+  confirmNo:    $('confirmNo'),
+  manualModal:  $('manualModal'),
+  manualInput:  $('manualInput'),
+  manualSubmit: $('manualSubmit'),
+  manualCancel: $('manualCancel'),
+  unmatchedTbody: $('unmatchedTbody'),
+  unmatchedBadge: $('unmatchedBadge'),
+  unmatchedBody:  $('unmatchedBody'),
+  unmatchedToggle:$('unmatchedToggle'),
+  historyTbody:   $('historyTbody'),
+  historyBadge:   $('historyBadge'),
+  historyBody:    $('historyBody'),
+  historyToggle:  $('historyToggle'),
+  clearHistoryBtn:$('clearHistoryBtn'),
+  statTotal:    $('statTotal'),
+  statScanned:  $('statScanned'),
+  statMissing:  $('statMissing'),
+  statUnmatched:$('statUnmatched'),
+  ringFg:       $('ringFg'),
+  ringPct:      $('ringPct'),
+  ringLabel:    $('ringLabel'),
+  ringStatus:   $('ringStatus'),
+  summaryDetail:$('summaryDetail'),
+  detailMPL:    $('detailMPL'),
+  detailTotalScans:$('detailTotalScans'),
+  detailAvg:    $('detailAvg'),
+  detailMost:   $('detailMost'),
+  detailStart:  $('detailStart'),
+  detailLast:   $('detailLast'),
+  fpAll:        $('fpAll'),
+  fpScanned:    $('fpScanned'),
+  fpPending:    $('fpPending'),
+  offlineBadge: $('offlineBadge'),
+};
 
-  const showStatus = (el, msg, type = "info") => {
-    el.className = `status ${type}`;
-    el.textContent = msg;
-  };
+// ─── Utilities ────────────────────────────────────────────────────────────────
+const norm = s => (s||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+const mpl  = code => code.substring(0, 4);
+const ts   = () => new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(()=>fn(...a), ms); }; };
 
-  const updateProgress = (percent) => {
-    elements.progressFill.style.width = `${percent}%`;
-    if (percent === 0) {
-      elements.progressBar.classList.add('hidden');
-    } else {
-      elements.progressBar.classList.remove('hidden');
-    }
-  };
+function setStatus(el, msg, type='info') {
+  el.className = 'status ' + type;
+  el.textContent = msg;
+}
 
-  const validateFile = (file) => {
-    if (file.size > MAX_FILE_SIZE) {
-      throw new Error(`File "${file.name}" is too large. Maximum size is 50MB.`);
-    }
-    
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp'];
-    if (!validTypes.some(type => file.type === type || file.name.toLowerCase().endsWith(type.split('/')[1]))) {
-      throw new Error(`File "${file.name}" has an unsupported format.`);
-    }
-  };
+function setProgress(pct) {
+  el.progressFill.style.width = pct + '%';
+  el.progressTrack.classList.toggle('visible', pct > 0);
+}
 
-  // State Management Functions
-  const updateCounter = () => {
-    const total = appState.uniquePLs.length;
-    if (total === 0) {
-      elements.counterEl.textContent = "No codes loaded";
-      elements.counterEl.className = "counter pending";
-    } else if (appState.scannedCount >= total) {
-      elements.counterEl.textContent = `✅ All ${total} codes scanned!`;
-      elements.counterEl.className = "counter success";
-    } else {
-      elements.counterEl.textContent = `${appState.scannedCount} / ${total} codes scanned`;
-      elements.counterEl.className = "counter pending";
-    }
-  };
+function vibrate(ms=50) { if('vibrate' in navigator) navigator.vibrate(ms); }
 
-  const updateClearBtnState = () => {
-    elements.clearBtn.disabled = appState.uniquePLs.length === 0;
-  };
+// ─── Summary / Ring ───────────────────────────────────────────────────────────
+function updateSummary() {
+  const total     = S.PLs.length;
+  const scanned   = S.scanned.size;
+  const missing   = total - scanned;
+  const unmatched = S.unmatched.length;
+  const pct       = total ? Math.round(scanned / total * 100) : 0;
+  const circumf   = 226.2;
 
-  const updateSummaryBreakdown = () => {
-    const total = appState.uniquePLs.length;
-    const scanned = appState.scannedSet.size;
-    const missing = total - scanned;
-    const unmatched = appState.unmatchedList.length;
+  el.statTotal.textContent    = total;
+  el.statScanned.textContent  = scanned;
+  el.statMissing.textContent  = missing;
+  el.statUnmatched.textContent= unmatched;
 
-    if (total === 0) {
-      elements.summaryBreakdown.textContent = "No data loaded";
-      return;
-    }
+  // Ring
+  const offset = circumf - (pct / 100) * circumf;
+  el.ringFg.style.strokeDashoffset = offset;
+  el.ringFg.style.stroke = pct === 100 ? 'var(--success)' : pct > 50 ? 'var(--accent)' : 'var(--danger)';
+  el.ringPct.textContent  = pct + '%';
+  el.ringStatus.textContent = total === 0
+    ? 'No data loaded'
+    : pct === 100
+      ? '🎉 All codes scanned!'
+      : `${scanned} of ${total} scanned`;
 
-    elements.summaryBreakdown.innerHTML = `
-      Total: ${total} | 
-      <span style="color:#2f855a">✅ Scanned: ${scanned}</span> | 
-      <span style="color:#c53030">❌ Missing: ${missing}</span> | 
-      <span style="color:#d69e2e">⚠ Unmatched: ${unmatched}</span>
-    `;
-  };
+  // Filter pill counts
+  el.fpAll.textContent     = total;
+  el.fpScanned.textContent = scanned;
+  el.fpPending.textContent = missing;
 
-  // Filtering and Search Functions
-  const matchesFilter = (pl) => {
-    const norm = normalize(pl);
-    const isScanned = appState.scannedSet.has(norm);
-    
-    switch (appState.currentFilter) {
-      case 'scanned': return isScanned;
-      case 'pending': return !isScanned;
-      default: return true;
-    }
-  };
+  // Unmatched badge
+  el.unmatchedBadge.textContent = unmatched;
+  el.historyBadge.textContent   = S.scanHistory.length;
 
-  const matchesSearch = (pl) => {
-    if (!appState.searchTerm) return true;
-    return pl.toLowerCase().includes(appState.searchTerm.toLowerCase());
-  };
+  // Detail breakdown
+  if (total > 0) {
+    el.summaryDetail.classList.add('visible');
 
-  const getFilteredPLs = () => {
-    return appState.uniquePLs.filter(pl => matchesFilter(pl) && matchesSearch(pl));
-  };
+    const groups = new Set(S.PLs.map(p => mpl(p))).size;
+    el.detailMPL.textContent = groups;
 
-  // Rendering Functions
-  const renderTable = () => {
-    elements.tableBody.innerHTML = "";
-    appState.plRowMap.clear();
+    const totalScans = [...S.scanCounts.values()].reduce((a,b)=>a+b, 0);
+    el.detailTotalScans.textContent = totalScans;
 
-    if (appState.uniquePLs.length === 0) {
-      elements.tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">Upload files to see PL codes here</td></tr>`;
-      elements.totalCell.textContent = "Total: 0 codes";
-      return;
-    }
+    const avg = scanned > 0 ? (totalScans / scanned).toFixed(1) : '—';
+    el.detailAvg.textContent = avg + (scanned > 0 ? 'x' : '');
 
-    const filteredPLs = getFilteredPLs();
-    
-    if (filteredPLs.length === 0) {
-      elements.tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">No codes match current filters</td></tr>`;
-      elements.totalCell.textContent = `Showing: 0 / ${appState.uniquePLs.length} codes`;
-      return;
-    }
+    // Most scanned code
+    let maxCode = '—', maxVal = 0;
+    S.scanCounts.forEach((v, k) => { if(v > maxVal) { maxVal = v; maxCode = k; } });
+    el.detailMost.textContent = maxVal > 1 ? `${maxCode} (${maxVal}x)` : (maxVal===1 ? maxCode : '—');
 
-    // Group PLs by MPL for better organization
-    const groupedPLs = new Map();
-    filteredPLs.forEach(pl => {
-      const mpl = extractMPL(pl);
-      if (!groupedPLs.has(mpl)) {
-        groupedPLs.set(mpl, []);
-      }
-      groupedPLs.get(mpl).push(pl);
-    });
+    el.detailStart.textContent = S.sessionStart || '—';
+    el.detailLast.textContent  = S.lastActivity || '—';
+  } else {
+    el.summaryDetail.classList.remove('visible');
+  }
+}
 
-    // Sort MPL groups
-    const sortedMPLs = Array.from(groupedPLs.keys()).sort();
-    
-    sortedMPLs.forEach(mpl => {
-      // Add MPL subheading row
-      const mplRow = document.createElement("tr");
-      mplRow.innerHTML = `<td colspan="5" style="background:#e2e8f0; font-weight:600; color:#2d3748; text-align:center; padding:8px;">📦 MPL: ${mpl} (${groupedPLs.get(mpl).length} codes)</td>`;
-      elements.tableBody.appendChild(mplRow);
-      
-      // Add PL codes for this MPL
-      groupedPLs.get(mpl).forEach(pl => {
-        const actualIndex = appState.uniquePLs.indexOf(pl);
-        const norm = normalize(pl);
-        const isScanned = appState.scannedSet.has(norm);
-        const scanCount = appState.scanCounts.get(norm) || 0;
-        const tr = document.createElement("tr");
-        
-        tr.innerHTML = `
-          <td style="padding-left:20px;">${actualIndex + 1}</td>
-          <td><input type="checkbox" ${isScanned ? "checked" : ""} data-pl="${norm}"></td>
-          <td style="font-family:monospace">${pl}</td>
-          <td class="count-cell">${scanCount > 0 ? `${scanCount}x` : '-'}</td>
-          <td class="remark-cell">${isScanned ? `✅ Scanned ${scanCount}x` : "❌ Not Scanned"}</td>
-        `;
-
-        if (isScanned) tr.classList.add("scanned");
-        elements.tableBody.appendChild(tr);
-        
-        appState.plRowMap.set(norm, {
-          row: tr,
-          checkbox: tr.querySelector("input"),
-          countCell: tr.querySelector(".count-cell"),
-          remarkCell: tr.querySelector(".remark-cell")
-        });
-      });
-    });
-
-    elements.totalCell.textContent = `Showing: ${filteredPLs.length} / ${appState.uniquePLs.length} codes (${sortedMPLs.length} MPL groups)`;
-
-    // Add checkbox event listeners
-    elements.tableBody.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-      checkbox.addEventListener('change', (e) => {
-        const pl = e.target.dataset.pl;
-        const entry = appState.plRowMap.get(pl);
-        
-        if (e.target.checked && !appState.scannedSet.has(pl)) {
-          onScanMatch(pl, "Manual Check");
-        } else if (!e.target.checked && appState.scannedSet.has(pl)) {
-          // Remove from scanned
-          appState.scannedSet.delete(pl);
-          appState.scannedCount--;
-          entry.row.classList.remove("scanned");
-          entry.remarkCell.textContent = "❌ Not Scanned";
-          updateCounter();
-          updateSummaryBreakdown();
-        }
-      });
-    });
-  };
-
-  const renderHistory = () => {
-    elements.historyTable.innerHTML = "";
-    
-    if (appState.scanHistory.length === 0) {
-      elements.historyTable.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#718096">No scan history</td></tr>`;
-      return;
-    }
-
-    // Show most recent first
-    const reversedHistory = [...appState.scanHistory].reverse();
-    reversedHistory.forEach((item, i) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${appState.scanHistory.length - i}</td>
-        <td style="font-family:monospace">${item.code}</td>
-        <td>${item.source}</td>
-        <td>${item.time}</td>
-      `;
-      elements.historyTable.appendChild(tr);
-    });
-  };
-
-  const renderUnmatched = () => {
-    elements.unmatchedTable.innerHTML = "";
-
-    if (appState.unmatchedList.length === 0) {
-      elements.unmatchedTable.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:#718096">No unmatched codes</td></tr>`;
-      return;
-    }
-
-    appState.unmatchedList.forEach((item, i) => {
-      const tr = document.createElement("tr");
-      const originalText = item.original ? `<br><small style="color:#718096">Original: ${item.original}</small>` : '';
-      tr.innerHTML = `
-        <td>${i + 1}</td>
-        <td style="font-family:monospace">${item.code}${originalText}</td>
-        <td>${item.source}</td>
-        <td>${item.time}</td>
-        <td><button onclick="this.parentElement.parentElement.remove(); appState.unmatchedList.splice(${i}, 1); updateSummaryBreakdown(); renderUnmatched();" 
-            style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;">Remove</button></td>
-      `;
-      elements.unmatchedTable.appendChild(tr);
-    });
-  };
-
-  // Scanning Functions
-  const onScanMatch = (rawCode, source = "Scanner") => {
-    const code = normalize(rawCode);
-    const scanMode = elements.scanModeToggle.checked ? 'multiple' : 'unique';
-    const timestamp = new Date().toLocaleTimeString();
-    
-    elements.lastScan.textContent = `Last: ${rawCode} → ${code}`;
-    elements.lastScan.classList.remove("hidden");
-
-    // Check format validity first
-    if (!PL_CANON.test(code)) {
-      showStatus(elements.scanStatus, `❌ Invalid PL code: ${rawCode}`, "error");
-      
-      // Add invalid codes to unmatched list for tracking
-      appState.unmatchedList.push({
-        code: code,
-        source: `${source} (Other PL)`,
-        time: timestamp,
-        original: rawCode !== code ? rawCode : undefined
-      });
-      renderUnmatched();
-      updateSummaryBreakdown();
-      return;
-    }
-
-    const entry = appState.plRowMap.get(code);
-    if (!entry) {
-      // Check if it exists in the full list but is filtered out
-      const exists = appState.uniquePLs.some(pl => normalize(pl) === code);
-      if (exists) {
-        showStatus(elements.scanStatus, `⚠ Code filtered out, clearing filters...`, "warning");
-        // Clear filters to show the code
-        appState.currentFilter = 'all';
-        appState.searchTerm = '';
-        elements.searchInput.value = '';
-        updateFilterButtons();
-        renderTable();
-        // Try again
-        setTimeout(() => onScanMatch(rawCode, source), 100);
-        return;
-      }
-      
-      showStatus(elements.scanStatus, `❌ Code not in list: ${code}`, "error");
-      appState.unmatchedList.push({
-        code: code,
-        source: `${source} (Not in List)`,
-        time: timestamp,
-        original: rawCode !== code ? rawCode : undefined
-      });
-      renderUnmatched();
-      updateSummaryBreakdown();
-      return;
-    }
-
-    // Add to scan history regardless of mode
-    appState.scanHistory.push({
-      code: code,
-      source: source,
-      time: timestamp,
-      original: rawCode
-    });
-
-    // Get current count
-    const currentCount = appState.scanCounts.get(code) || 0;
-    const newCount = currentCount + 1;
-    
-    if (scanMode === 'unique' && appState.scannedSet.has(code)) {
-      // Unique mode - show already scanned
-      entry.remarkCell.textContent = `✅ Already scanned (${currentCount}x)`;
-      showStatus(elements.scanStatus, `⚠ Already scanned: ${code} (${currentCount} times total)`, "warning");
-      return;
-    }
-
-    // Update counts
-    appState.scanCounts.set(code, newCount);
-    
-    // Mark as scanned if first time
-    if (!appState.scannedSet.has(code)) {
-      appState.scannedSet.add(code);
-      appState.scannedCount++;
-      entry.checkbox.checked = true;
-      entry.row.classList.add("scanned");
-    }
-
-    // Update display
-    entry.countCell.textContent = `${newCount}x`;
-    entry.remarkCell.textContent = `✅ Scanned ${newCount}x (Last: ${timestamp})`;
-    
-    updateCounter();
-    showStatus(elements.scanStatus, `✅ ${code} - Scan #${newCount}`, "success");
-    updateSummaryBreakdown();
-  };
-
-  // File Processing Functions
-  const sanitiseMatch = (raw) => {
-    if (!raw) return null;
-    const s = raw.replace(/\s+/g, "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-    return PL_CANON.test(s) ? s : null;
-  };
-
-  const findAndSanitiseAll = (text) => {
-    const out = [];
-    if (!text) return out;
-    PL_FLEX_GLOBAL.lastIndex = 0;
-    let m;
-    while ((m = PL_FLEX_GLOBAL.exec(text)) !== null) {
-      const san = sanitiseMatch(m[0]);
-      if (san) out.push(san);
-    }
-    return out;
-  };
-
-  const extractPLsFromPDF = async (file) => {
-    if (typeof pdfjsLib === 'undefined') {
-      throw new Error('PDF.js library not loaded. Please check your internet connection and refresh the page.');
-    }
-    
-    try {
-      const data = new Uint8Array(await file.arrayBuffer());
-      const pdf = await pdfjsLib.getDocument({ data }).promise;
-      let found = [];
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        updateProgress((i / pdf.numPages) * 100);
-        
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        
-        // Look for PL codes in specific positions and generally
-        const pageCandidates = [];
-        textContent.items.forEach(t => {
-          if (t.str && ((t.transform[4] >= PL_X_MIN && t.transform[4] <= PL_X_MAX && PL_FLEX.test(t.str)) || PL_FLEX.test(t.str))) {
-            pageCandidates.push({ text: t.str, x: t.transform[4] });
-          }
-        });
-
-        pageCandidates.forEach(c => {
-          const san = sanitiseMatch(c.text);
-          if (san) found.push(san);
-        });
-
-        // Also check the joined text
-        const joined = textContent.items.map(it => it.str || '').join(" ");
-        found.push(...findAndSanitiseAll(joined));
-      }
-
-      return found;
-    } catch (error) {
-      console.error('PDF extraction error:', error);
-      throw new Error(`Failed to extract from PDF: ${error.message}`);
-    }
-  };
-
-  const extractPLsFromImage = async (file) => {
-    if (typeof Tesseract === 'undefined') {
-      throw new Error('Tesseract.js library not loaded. Please check your internet connection and refresh the page.');
-    }
-    
-    return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error('OCR processing timeout (30 seconds)'));
-      }, 30000); // 30 second timeout
-
-      Tesseract.recognize(file, "eng", {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            updateProgress(m.progress * 100);
-          }
-        }
-      }).then(({ data: { text } }) => {
-        clearTimeout(timeoutId);
-        resolve(findAndSanitiseAll(text));
-      }).catch((error) => {
-        clearTimeout(timeoutId);
-        reject(new Error(`OCR failed: ${error.message}`));
-      });
-    });
-  };
-
-  const finalizePLs = (arr) => {
-    const set = new Set();
-    arr.forEach(c => set.add(normalize(c)));
-    return Array.from(set).filter(c => PL_CANON.test(c)).sort();
-  };
-
-  // Filter Functions
-  const updateFilterButtons = () => {
-    document.querySelectorAll('[id^="filter"]').forEach(btn => {
-      btn.style.backgroundColor = btn.id === `filter${appState.currentFilter.charAt(0).toUpperCase() + appState.currentFilter.slice(1)}` || 
-                                  (btn.id === 'filterAll' && appState.currentFilter === 'all') ? '#3182ce' : '#718096';
-    });
-  };
-
-  // Event Listeners
-  elements.fileDropZone.addEventListener('click', () => elements.fileInput.click());
-
-  // Drag and drop
-  elements.fileDropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    elements.fileDropZone.classList.add('drag-over');
+// ─── Table Rendering ──────────────────────────────────────────────────────────
+function getFiltered() {
+  return S.PLs.filter(pl => {
+    const n = norm(pl);
+    const matched = S.filter === 'all'     ? true
+                  : S.filter === 'scanned' ? S.scanned.has(n)
+                  :                         !S.scanned.has(n);
+    const searched = !S.search || pl.includes(S.search) || mpl(pl).includes(S.search);
+    return matched && searched;
   });
+}
 
-  elements.fileDropZone.addEventListener('dragleave', () => {
-    elements.fileDropZone.classList.remove('drag-over');
-  });
+function renderTable() {
+  S.rowMap.clear();
+  const filtered = getFiltered();
 
-  elements.fileDropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    elements.fileDropZone.classList.remove('drag-over');
-    elements.fileInput.files = e.dataTransfer.files;
-  });
-
-  elements.barcodeInput.addEventListener("blur", () => 
-    setTimeout(() => elements.barcodeInput.focus(), 200)
-  );
-
-  elements.barcodeInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const val = elements.barcodeInput.value.trim();
-      if (val) {
-        onScanMatch(val, "Scanner");
-        elements.barcodeInput.value = "";
-      }
-    }
-  });
-
-  // Toggle mode functionality
-  elements.scanModeToggle.addEventListener("change", () => {
-    const isMultiple = elements.scanModeToggle.checked;
-    elements.scanModeLabel.textContent = isMultiple ? "Multiple" : "Single";
-    elements.scanModeLabel.style.color = isMultiple ? "#2f855a" : "#4a5568";
-  });
-
-  // Manual entry
-  elements.manualBtn.addEventListener("click", () => {
-    elements.manualInput.value = "";
-    elements.manualModal.classList.remove("hidden");
-    setTimeout(() => elements.manualInput.focus(), 200);
-  });
-
-  elements.manualCancel.addEventListener("click", () => {
-    elements.manualModal.classList.add("hidden");
-  });
-
-  elements.manualSubmit.addEventListener("click", () => {
-    const val = elements.manualInput.value.trim();
-    if (val) {
-      elements.manualModal.classList.add("hidden");
-      onScanMatch(val, "Manual");
-    }
-  });
-
-  elements.manualInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      elements.manualSubmit.click();
-    }
-  });
-
-  // Clear functionality
-  elements.clearBtn.addEventListener("click", () => {
-    elements.confirmModal.classList.remove("hidden");
-  });
-
-  elements.confirmYes.addEventListener("click", () => {
-    appState.scannedSet.clear();
-    appState.scannedCount = 0;
-    appState.scanCounts.clear();
-    appState.plRowMap.forEach((entry) => {
-      entry.checkbox.checked = false;
-      entry.row.classList.remove("scanned");
-      entry.remarkCell.textContent = "❌ Not Scanned";
-      entry.countCell.textContent = "-";
-    });
-    appState.unmatchedList = [];
-    renderUnmatched();
-    updateCounter();
-    renderTable();
-    elements.lastScan.classList.add("hidden");
-    showStatus(elements.scanStatus, "🧹 All marks cleared", "info");
-    elements.confirmModal.classList.add("hidden");
-    updateSummaryBreakdown();
-  });
-
-  elements.confirmNo.addEventListener("click", () => {
-    elements.confirmModal.classList.add("hidden");
-  });
-
-  // Search and filter
-  const debouncedSearch = debounce(() => {
-    appState.searchTerm = elements.searchInput.value.trim();
-    renderTable();
-  }, DEBOUNCE_DELAY);
-
-  elements.searchInput.addEventListener("input", debouncedSearch);
-
-  elements.filterAll.addEventListener("click", () => {
-    appState.currentFilter = 'all';
-    updateFilterButtons();
-    renderTable();
-  });
-
-  elements.filterScanned.addEventListener("click", () => {
-    appState.currentFilter = 'scanned';
-    updateFilterButtons();
-    renderTable();
-  });
-
-  elements.filterPending.addEventListener("click", () => {
-    appState.currentFilter = 'pending';
-    updateFilterButtons();
-    renderTable();
-  });
-
-  // Download functionality
-  elements.downloadBtn.addEventListener("click", () => {
-    if (appState.uniquePLs.length === 0) {
-      alert("❌ No PL codes to download");
-      return;
-    }
-
-    try {
-      let rows = [["PL Code", "Status", "Scan Count", "Timestamp", "Index"]];
-
-      appState.uniquePLs.forEach((pl, index) => {
-        const norm = normalize(pl);
-        const entry = appState.plRowMap.get(norm);
-        const scanCount = appState.scanCounts.get(norm) || 0;
-        let status = "❌ Not Scanned";
-        let timestamp = "";
-
-        if (appState.scannedSet.has(norm)) {
-          status = "✅ Scanned";
-          const text = entry?.remarkCell?.textContent || "";
-          const match = text.match(/Last: (.+)\)$/);
-          if (match) timestamp = match[1];
-        }
-
-        rows.push([pl, status, scanCount, timestamp, index + 1]);
-      });
-
-      // Add unmatched entries
-      if (appState.unmatchedList.length > 0) {
-        rows.push([]);
-        rows.push(["=== UNMATCHED ENTRIES ==="]);
-        appState.unmatchedList.forEach(u => {
-          rows.push([u.code, `⚠️ Unmatched (${u.source})`, "", u.time, ""]);
-        });
-      }
-
-      // Add scan history
-      if (appState.scanHistory.length > 0) {
-        rows.push([]);
-        rows.push(["=== SCAN HISTORY ==="]);
-        rows.push(["PL Code", "Source", "Time", "Original", "Scan #"]);
-        appState.scanHistory.forEach((scan, index) => {
-          rows.push([scan.code, scan.source, scan.time, scan.original || "", index + 1]);
-        });
-      }
-
-      // Add summary
-      rows.push([]);
-      rows.push([
-        "SUMMARY",
-        `Total: ${appState.uniquePLs.length}`,
-        `✅ Scanned: ${appState.scannedSet.size}`,
-        `❌ Missing: ${appState.uniquePLs.length - appState.scannedSet.size}`,
-        ""
-      ]);
-      rows.push([
-        "",
-        `⚠ Unmatched: ${appState.unmatchedList.length}`,
-        `📜 Total Scans: ${appState.scanHistory.length}`,
-        `Generated: ${new Date().toLocaleString()}`,
-        ""
-      ]);
-
-      const csvContent = rows.map(r => r.map(f => `"${f}"`).join(",")).join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `pl-codes-summary-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      showStatus(elements.scanStatus, "✅ Summary downloaded", "success");
-    } catch (error) {
-      console.error('Download error:', error);
-      alert("❌ Error generating download");
-    }
-  });
-
-  // Extract functionality with better error handling
-  elements.extractBtn.addEventListener("click", async () => {
-    if (appState.isProcessing) return;
-
-    const files = Array.from(elements.fileInput.files);
-    if (files.length === 0) {
-      showStatus(elements.extractStatus, "❌ Please select files first", "error");
-      return;
-    }
-
-    // Check if libraries are loaded
-    const pdfOK = typeof pdfjsLib !== 'undefined';
-    const ocrOK = typeof Tesseract !== 'undefined';
-    
-    const hasPDFs = files.some(f => f.type === 'application/pdf');
-    const hasImages = files.some(f => f.type.startsWith('image/'));
-    
-    if (hasPDFs && !pdfOK) {
-      showStatus(elements.extractStatus, "❌ PDF.js library failed to load. Please refresh the page.", "error");
-      return;
-    }
-    
-    if (hasImages && !ocrOK) {
-      showStatus(elements.extractStatus, "❌ Tesseract.js library failed to load. Please refresh the page.", "error");
-      return;
-    }
-
-    appState.isProcessing = true;
-    elements.extractBtn.disabled = true;
-    elements.extractBtn.textContent = "🔄 Processing...";
-    showStatus(elements.extractStatus, "Processing files...", "info");
-    updateProgress(0);
-
-    try {
-      // Validate all files first
-      for (const file of files) {
-        validateFile(file);
-      }
-
-      let allCodes = [];
-      let processedFiles = 0;
-      let errorCount = 0;
-
-      for (const file of files) {
-        showStatus(elements.extractStatus, `Processing: ${file.name}`, "info");
-        
-        try {
-          let codes = [];
-          if (file.type === "application/pdf") {
-            codes = await extractPLsFromPDF(file);
-          } else if (file.type.startsWith("image/")) {
-            codes = await extractPLsFromImage(file);
-          }
-          
-          allCodes.push(...codes);
-          processedFiles++;
-        } catch (error) {
-          console.error(`Error processing ${file.name}:`, error);
-          errorCount++;
-          showStatus(elements.extractStatus, `⚠ Error in ${file.name}: ${error.message}`, "warning");
-          
-          // Continue processing other files
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause to show error
-        }
-      }
-
-      // Finalize and update state
-      appState.uniquePLs = finalizePLs(allCodes);
-      appState.scannedSet.clear();
-      appState.scannedCount = 0;
-      appState.unmatchedList = [];
-      appState.scanCounts.clear(); // Reset scan counts
-      appState.scanHistory = []; // Reset scan history
-      appState.currentFilter = 'all';
-      appState.searchTerm = '';
-      elements.searchInput.value = '';
-
-      // Update UI
-      renderTable();
-      renderUnmatched();
-      updateCounter();
-      updateClearBtnState();
-      updateSummaryBreakdown();
-      updateFilterButtons();
-
-      updateProgress(0);
-      
-      let statusMessage = `✅ Extracted ${appState.uniquePLs.length} unique codes`;
-      if (errorCount > 0) {
-        statusMessage += ` (${errorCount} files had errors)`;
-      }
-      
-      showStatus(elements.extractStatus, statusMessage, errorCount > 0 ? "warning" : "success");
-      showStatus(elements.scanStatus, "🎯 Ready to scan codes", "info");
-
-    } catch (error) {
-      console.error('Extraction error:', error);
-      showStatus(elements.extractStatus, `❌ Error: ${error.message}`, "error");
-      updateProgress(0);
-    } finally {
-      appState.isProcessing = false;
-      elements.extractBtn.disabled = false;
-      elements.extractBtn.textContent = "🔍 Extract PL Codes";
-    }
-  });
-
-  // Modal click outside to close
-  [elements.confirmModal, elements.manualModal].forEach(modal => {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        modal.classList.add('hidden');
-      }
-    });
-  });
-
-  // Keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
-    // Escape to close modals
-    if (e.key === 'Escape') {
-      elements.confirmModal.classList.add('hidden');
-      elements.manualModal.classList.add('hidden');
-    }
-    
-    // Ctrl/Cmd + / to focus search
-    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
-      e.preventDefault();
-      elements.searchInput.focus();
-    }
-    
-    // Ctrl/Cmd + Enter to focus barcode input
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      e.preventDefault();
-      elements.barcodeInput.focus();
-    }
-  });
-
-  // History controls
-  elements.showHistoryBtn.addEventListener("click", () => {
-    const isVisible = elements.historyContainer.style.display !== 'none';
-    if (isVisible) {
-      elements.historyContainer.style.display = 'none';
-      elements.showHistoryBtn.textContent = 'Show History';
-    } else {
-      renderHistory();
-      elements.historyContainer.style.display = 'block';
-      elements.showHistoryBtn.textContent = 'Hide History';
-    }
-  });
-
-  elements.clearHistoryBtn.addEventListener("click", () => {
-    if (confirm('Clear all scan history? This cannot be undone.')) {
-      appState.scanHistory = [];
-      renderHistory();
-      showStatus(elements.scanStatus, "🗑️ Scan history cleared", "info");
-    }
-  });
-
-  // Initialize
-  updateCounter();
-  updateClearBtnState();
-  updateSummaryBreakdown();
-  updateFilterButtons();
-
-  // Auto-focus barcode input when ready
-  if (elements.barcodeInput) {
-    elements.barcodeInput.focus();
+  if (S.PLs.length === 0) {
+    el.plTbody.innerHTML = `<tr><td class="empty-cell" colspan="5">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      Upload files to extract PL codes
+    </td></tr>`;
+    el.totalCell.textContent = 'Total: 0 codes';
+    return;
   }
 
-  // Offline status indicator
-  const createOfflineIndicator = () => {
-    const indicator = document.createElement('div');
-    indicator.id = 'offlineIndicator';
-    indicator.style.cssText = `
-      position: fixed; top: 10px; right: 10px; z-index: 2000;
-      padding: 8px 16px; border-radius: 20px; font-size: 14px;
-      font-weight: 600; transition: all 0.3s ease;
-      display: none;
-    `;
-    document.body.appendChild(indicator);
-    return indicator;
-  };
+  if (filtered.length === 0) {
+    el.plTbody.innerHTML = `<tr><td class="empty-cell" colspan="5">No codes match the current filter</td></tr>`;
+    el.totalCell.textContent = `Showing 0 / ${S.PLs.length}`;
+    return;
+  }
 
-  const offlineIndicator = createOfflineIndicator();
+  // Group by MPL
+  const groups = new Map();
+  filtered.forEach(pl => {
+    const m = mpl(pl);
+    if (!groups.has(m)) groups.set(m, []);
+    groups.get(m).push(pl);
+  });
 
-  const updateOfflineStatus = () => {
-    if (navigator.onLine) {
-      offlineIndicator.style.display = 'none';
-    } else {
-      offlineIndicator.textContent = '📡 Offline Mode';
-      offlineIndicator.style.cssText += 'background: #fed7d7; color: #c53030; display: block;';
+  const frag = document.createDocumentFragment();
+  let rowNum = 0;
+
+  Array.from(groups.keys()).sort().forEach(mplKey => {
+    const pls = groups.get(mplKey);
+    const mplScanned = pls.filter(pl => S.scanned.has(norm(pl))).length;
+
+    // Group header
+    const hdr = document.createElement('tr');
+    hdr.className = 'mpl-group-header';
+    hdr.innerHTML = `<td colspan="5">
+      <span class="mpl-tag">📦 ${mplKey}</span>
+      &nbsp; ${pls.length} codes &nbsp;·&nbsp;
+      <span style="color:var(--success)">${mplScanned} scanned</span>
+      &nbsp;·&nbsp; <span style="color:var(--danger)">${pls.length - mplScanned} pending</span>
+    </td>`;
+    frag.appendChild(hdr);
+
+    pls.forEach(pl => {
+      rowNum++;
+      const n = norm(pl);
+      const isScanned  = S.scanned.has(n);
+      const scanCount  = S.scanCounts.get(n) || 0;
+      const realIdx    = S.PLs.indexOf(pl) + 1;
+
+      const tr = document.createElement('tr');
+      if (isScanned) tr.classList.add('scanned');
+
+      tr.innerHTML = `
+        <td class="td-idx">${realIdx}</td>
+        <td class="td-check"><input type="checkbox" data-pl="${n}" ${isScanned ? 'checked' : ''}></td>
+        <td class="td-code">${pl}</td>
+        <td class="td-count">${scanCount > 0 ? scanCount+'×' : '—'}</td>
+        <td class="td-status">
+          <span class="status-badge ${isScanned ? 'badge-scanned' : 'badge-pending'}">
+            ${isScanned ? '✓ Scanned' : '✕ Pending'}
+          </span>
+        </td>`;
+
+      const cb         = tr.querySelector('input[type=checkbox]');
+      const countCell  = tr.querySelector('.td-count');
+      const statusCell = tr.querySelector('.td-status');
+
+      cb.addEventListener('change', e => {
+        if (e.target.checked && !S.scanned.has(n)) {
+          onScan(n, 'Manual Check');
+        } else if (!e.target.checked && S.scanned.has(n)) {
+          S.scanned.delete(n);
+          S.scanCounts.delete(n);
+          tr.classList.remove('scanned');
+          statusCell.innerHTML = `<span class="status-badge badge-pending">✕ Pending</span>`;
+          countCell.textContent = '—';
+          updateSummary();
+        }
+      });
+
+      S.rowMap.set(n, { row: tr, cb, countCell, statusCell });
+      frag.appendChild(tr);
+    });
+  });
+
+  el.plTbody.innerHTML = '';
+  el.plTbody.appendChild(frag);
+  el.totalCell.textContent = filtered.length === S.PLs.length
+    ? `${S.PLs.length} codes · ${new Set(Array.from(groups.keys())).size} MPL groups`
+    : `Showing ${filtered.length} / ${S.PLs.length} codes`;
+}
+
+// ─── Scan Logic ───────────────────────────────────────────────────────────────
+function onScan(rawCode, source = 'Scanner') {
+  const code = norm(rawCode);
+  const now  = ts();
+
+  // Update last-scan chip
+  el.lastScanCode.textContent = code;
+  el.lastScanTime.textContent = now;
+  el.lastScanChip.classList.add('visible');
+  S.lastActivity = now;
+  if (!S.sessionStart) S.sessionStart = now;
+
+  // Validate format
+  if (!PL_CANON.test(code)) {
+    setStatus(el.scanStatus, `⚠️ Not a valid PL format: ${code}`, 'error');
+    vibrate([50,30,50]);
+    S.unmatched.push({ code, reason: 'Invalid format', time: now });
+    renderUnmatched();
+    updateSummary();
+    return;
+  }
+
+  // Auto-clear filter if code exists but is filtered out
+  const exists = S.PLs.some(pl => norm(pl) === code);
+  const entry  = S.rowMap.get(code);
+
+  if (!entry && exists) {
+    S.filter = 'all'; S.search = '';
+    el.searchInput.value = '';
+    updateFilterPills();
+    renderTable();
+    setTimeout(() => onScan(rawCode, source), 80);
+    return;
+  }
+
+  if (!entry) {
+    setStatus(el.scanStatus, `❌ Code not in list: ${code}`, 'error');
+    vibrate([50,30,50]);
+    S.unmatched.push({ code, reason: 'Not in list', time: now });
+    renderUnmatched();
+    updateSummary();
+    return;
+  }
+
+  // Scan history
+  S.scanHistory.push({ code, source, time: now });
+  el.historyBadge.textContent = S.scanHistory.length;
+  if ($('historyBody').classList.contains('open')) renderHistory();
+
+  const curCount = S.scanCounts.get(code) || 0;
+  const newCount = curCount + 1;
+
+  if (S.scanMode === 'unique' && S.scanned.has(code)) {
+    setStatus(el.scanStatus, `⚠️ Already scanned: ${code} (${curCount}×)`, 'warning');
+    vibrate(30);
+    return;
+  }
+
+  S.scanCounts.set(code, newCount);
+
+  if (!S.scanned.has(code)) {
+    S.scanned.add(code);
+    entry.row.classList.add('scanned');
+    entry.cb.checked = true;
+  }
+
+  // Flash animation
+  entry.row.classList.remove('flash-in');
+  void entry.row.offsetWidth; // reflow
+  entry.row.classList.add('flash-in');
+
+  entry.countCell.textContent = newCount + '×';
+  entry.statusCell.innerHTML  = `<span class="status-badge badge-scanned">✓ Scanned</span>`;
+
+  setStatus(el.scanStatus, `✅ ${code} — scan #${newCount}`, 'success');
+  vibrate(60);
+
+  // Scroll row into view
+  entry.row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  updateSummary();
+}
+
+// ─── Render Helpers ───────────────────────────────────────────────────────────
+function renderUnmatched() {
+  el.unmatchedBadge.textContent = S.unmatched.length;
+  if (S.unmatched.length === 0) {
+    el.unmatchedTbody.innerHTML = `<tr><td class="empty-cell" colspan="5">No unmatched codes yet</td></tr>`;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  S.unmatched.forEach((u, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td-idx">${i+1}</td>
+      <td class="td-code">${u.code}</td>
+      <td style="font-size:0.78rem;color:var(--warn)">${u.reason}</td>
+      <td style="font-size:0.72rem;color:var(--text-muted)">${u.time}</td>
+      <td><button onclick="S.unmatched.splice(${i},1);renderUnmatched();updateSummary();"
+        style="font-size:0.7rem;padding:2px 7px;border-radius:4px;border:none;cursor:pointer;background:rgba(239,68,68,0.15);color:var(--danger)">✕</button></td>`;
+    frag.appendChild(tr);
+  });
+  el.unmatchedTbody.innerHTML = '';
+  el.unmatchedTbody.appendChild(frag);
+}
+
+function renderHistory() {
+  if (S.scanHistory.length === 0) {
+    el.historyTbody.innerHTML = `<tr><td class="empty-cell" colspan="4">No scan history</td></tr>`;
+    return;
+  }
+  const reversed = [...S.scanHistory].reverse();
+  const frag = document.createDocumentFragment();
+  reversed.forEach((h, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td-idx">${S.scanHistory.length - i}</td>
+      <td class="td-code">${h.code}</td>
+      <td style="font-size:0.78rem;color:var(--text-dim)">${h.source}</td>
+      <td style="font-size:0.72rem;color:var(--text-muted)">${h.time}</td>`;
+    frag.appendChild(tr);
+  });
+  el.historyTbody.innerHTML = '';
+  el.historyTbody.appendChild(frag);
+}
+
+// ─── Filter Pills ─────────────────────────────────────────────────────────────
+function updateFilterPills() {
+  $$('.filter-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === S.filter);
+  });
+}
+
+// ─── PDF / Image Extraction ───────────────────────────────────────────────────
+const sanitise = raw => {
+  if (!raw) return null;
+  const s = raw.replace(/\s+/g,'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+  return PL_CANON.test(s) ? s : null;
+};
+const findAll = text => {
+  const out = []; if (!text) return out;
+  PL_FLEX_GLOBAL.lastIndex = 0;
+  let m;
+  while ((m = PL_FLEX_GLOBAL.exec(text)) !== null) {
+    const s = sanitise(m[0]);
+    if (s) out.push(s);
+  }
+  return out;
+};
+
+async function extractFromPDF(file) {
+  if (typeof pdfjsLib === 'undefined') throw new Error('PDF.js not loaded — check internet connection.');
+  const data = new Uint8Array(await file.arrayBuffer());
+  const pdf  = await pdfjsLib.getDocument({ data }).promise;
+  const found = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    setProgress((i / pdf.numPages) * 100);
+    const page = await pdf.getPage(i);
+    const tc   = await page.getTextContent();
+    tc.items.forEach(t => {
+      if (t.str && PL_FLEX.test(t.str)) {
+        const s = sanitise(t.str);
+        if (s) found.push(s);
+      }
+    });
+    const joined = tc.items.map(t => t.str||'').join(' ');
+    found.push(...findAll(joined));
+  }
+  return found;
+}
+
+async function extractFromImage(file) {
+  if (typeof Tesseract === 'undefined') throw new Error('Tesseract.js not loaded — check internet connection.');
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('OCR timeout (30s)')), 30000);
+    Tesseract.recognize(file, 'eng', {
+      logger: m => { if (m.status === 'recognizing text') setProgress(m.progress * 100); }
+    }).then(({ data: { text } }) => {
+      clearTimeout(timeout);
+      resolve(findAll(text));
+    }).catch(e => { clearTimeout(timeout); reject(e); });
+  });
+}
+
+const finalize = arr => {
+  const set = new Set();
+  arr.forEach(c => set.add(norm(c)));
+  return Array.from(set).filter(c => PL_CANON.test(c)).sort();
+};
+
+// ─── File UI ──────────────────────────────────────────────────────────────────
+function renderFileList(files) {
+  el.fileList.innerHTML = '';
+  Array.from(files).forEach(f => {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    chip.innerHTML = `<span>${f.name}</span><span style="color:var(--text-muted);white-space:nowrap">${(f.size/1024).toFixed(0)} KB</span>`;
+    el.fileList.appendChild(chip);
+  });
+}
+
+// ─── Event Wiring ─────────────────────────────────────────────────────────────
+
+// Drop Zone
+el.dropZone.addEventListener('click', () => el.fileInput.click());
+el.fileInput.addEventListener('change', () => {
+  if (el.fileInput.files.length) renderFileList(el.fileInput.files);
+});
+el.dropZone.addEventListener('dragover',  e => { e.preventDefault(); el.dropZone.classList.add('drag-over'); });
+el.dropZone.addEventListener('dragleave', () => el.dropZone.classList.remove('drag-over'));
+el.dropZone.addEventListener('drop',      e => {
+  e.preventDefault(); el.dropZone.classList.remove('drag-over');
+  const dt = e.dataTransfer;
+  if (dt.files.length) {
+    // Assign to input
+    try { el.fileInput.files = dt.files; } catch(_) {}
+    renderFileList(dt.files);
+  }
+});
+
+// Extract
+el.extractBtn.addEventListener('click', async () => {
+  if (S.processing) return;
+  const files = Array.from(el.fileInput.files);
+  if (!files.length) { setStatus(el.extractStatus, '❌ No files selected', 'error'); return; }
+
+  const hasPDFs   = files.some(f => f.type === 'application/pdf');
+  const hasImages = files.some(f => f.type.startsWith('image/'));
+  if (hasPDFs && typeof pdfjsLib === 'undefined')   { setStatus(el.extractStatus, '❌ PDF.js failed to load. Refresh and try again.', 'error'); return; }
+  if (hasImages && typeof Tesseract === 'undefined') { setStatus(el.extractStatus, '❌ Tesseract.js failed to load. Refresh and try again.', 'error'); return; }
+
+  S.processing = true;
+  el.extractBtn.disabled = true;
+  el.extractBtn.innerHTML = '⏳ Processing…';
+  setProgress(0);
+
+  try {
+    let allCodes = [], errors = 0;
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) { setStatus(el.extractStatus, `⚠️ Skipping ${file.name} — exceeds 50 MB`, 'warning'); errors++; continue; }
+      setStatus(el.extractStatus, `Processing: ${file.name}`, 'info');
+      try {
+        const codes = file.type === 'application/pdf'
+          ? await extractFromPDF(file)
+          : await extractFromImage(file);
+        allCodes.push(...codes);
+      } catch(e) {
+        errors++;
+        setStatus(el.extractStatus, `⚠️ ${file.name}: ${e.message}`, 'warning');
+        await new Promise(r => setTimeout(r, 800));
+      }
     }
-  };
 
-  // Check if external resources loaded successfully
-  const checkResourcesLoaded = () => {
-    const resourcesOK = typeof pdfjsLib !== 'undefined' && typeof Tesseract !== 'undefined';
-    if (!resourcesOK && !navigator.onLine) {
-      offlineIndicator.textContent = '⚠️ Limited Offline Mode - File processing unavailable';
-      offlineIndicator.style.cssText += 'background: #fef5e7; color: #d69e2e; display: block;';
+    // Reset state
+    S.PLs = finalize(allCodes);
+    S.scanned.clear(); S.scanCounts.clear();
+    S.scanHistory = []; S.unmatched = [];
+    S.filter = 'all'; S.search = '';
+    S.sessionStart = null; S.lastActivity = null;
+    el.searchInput.value = '';
+    updateFilterPills();
+
+    renderTable(); renderUnmatched(); renderHistory(); updateSummary();
+    el.clearBtn.disabled = S.PLs.length === 0;
+    setProgress(0);
+
+    const msg = `✅ ${S.PLs.length} unique PL codes extracted` + (errors ? ` (${errors} file errors)` : '');
+    setStatus(el.extractStatus, msg, errors ? 'warning' : 'success');
+    setStatus(el.scanStatus, '🎯 Ready — scan barcodes or type codes', 'info');
+    el.barcodeInput.focus();
+
+  } catch(e) {
+    setStatus(el.extractStatus, `❌ ${e.message}`, 'error');
+    setProgress(0);
+  } finally {
+    S.processing = false;
+    el.extractBtn.disabled = false;
+    el.extractBtn.innerHTML = '🔍 Extract PL Codes';
+  }
+});
+
+// Barcode input
+el.barcodeInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const v = el.barcodeInput.value.trim();
+    if (v) { onScan(v, 'Scanner'); el.barcodeInput.value = ''; }
+  }
+});
+el.barcodeInput.addEventListener('blur', () => setTimeout(() => el.barcodeInput.focus(), 150));
+
+// Scan mode pills
+$$('.mode-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    S.scanMode = btn.dataset.mode;
+    $$('.mode-pill').forEach(b => b.classList.toggle('active', b === btn));
+  });
+});
+
+// Search & filter
+const debouncedSearch = debounce(() => {
+  S.search = el.searchInput.value.trim().toUpperCase();
+  renderTable();
+}, DEBOUNCE_MS);
+el.searchInput.addEventListener('input', debouncedSearch);
+
+$$('.filter-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    S.filter = btn.dataset.filter;
+    updateFilterPills();
+    renderTable();
+  });
+});
+
+// Clear
+el.clearBtn.addEventListener('click', () => el.confirmModal.classList.remove('hidden'));
+el.confirmYes.addEventListener('click', () => {
+  S.scanned.clear(); S.scanCounts.clear(); S.unmatched = [];
+  S.sessionStart = null; S.lastActivity = null;
+  el.confirmModal.classList.add('hidden');
+  renderTable(); renderUnmatched(); updateSummary();
+  el.lastScanChip.classList.remove('visible');
+  setStatus(el.scanStatus, '🧹 All scan marks cleared', 'info');
+});
+el.confirmNo.addEventListener('click', () => el.confirmModal.classList.add('hidden'));
+
+// Manual entry
+el.manualBtn.addEventListener('click', () => {
+  el.manualInput.value = '';
+  el.manualModal.classList.remove('hidden');
+  setTimeout(() => el.manualInput.focus(), 150);
+});
+el.manualCancel.addEventListener('click', () => el.manualModal.classList.add('hidden'));
+el.manualSubmit.addEventListener('click', () => {
+  const v = el.manualInput.value.trim();
+  if (v) { el.manualModal.classList.add('hidden'); onScan(v, 'Manual'); }
+});
+el.manualInput.addEventListener('keydown', e => { if(e.key==='Enter') el.manualSubmit.click(); });
+
+// Modals close on backdrop click
+[el.confirmModal, el.manualModal].forEach(m => {
+  m.addEventListener('click', e => { if(e.target === m) m.classList.add('hidden'); });
+});
+
+// Collapsibles
+function setupCollapsible(toggleBtn, body) {
+  toggleBtn.addEventListener('click', () => {
+    const open = body.classList.toggle('open');
+    toggleBtn.textContent = open ? 'Hide' : 'Show';
+    if (open) {
+      if (body === el.historyBody) renderHistory();
     }
-    return resourcesOK;
-  };
+  });
+}
+setupCollapsible(el.unmatchedToggle, el.unmatchedBody);
+setupCollapsible(el.historyToggle,   el.historyBody);
 
-  // Network status listeners
-  window.addEventListener('online', updateOfflineStatus);
-  window.addEventListener('offline', updateOfflineStatus);
-  
-  // Initial check
-  updateOfflineStatus();
-  setTimeout(checkResourcesLoaded, 1000);
+el.clearHistoryBtn.addEventListener('click', () => {
+  if (!confirm('Clear all scan history?')) return;
+  S.scanHistory = [];
+  el.historyBadge.textContent = 0;
+  renderHistory();
+  setStatus(el.scanStatus, '🗑️ Scan history cleared', 'info');
+});
 
+// Download CSV
+el.downloadBtn.addEventListener('click', () => {
+  if (!S.PLs.length) { alert('No PL codes to export.'); return; }
+
+  const q = v => `"${String(v).replace(/"/g,'""')}"`;
+
+  let rows = [['PL Code','MPL Group','Status','Scan Count','Last Scanned']];
+  S.PLs.forEach(pl => {
+    const n  = norm(pl);
+    const ok = S.scanned.has(n);
+    rows.push([pl, mpl(pl), ok ? 'Scanned' : 'Pending', S.scanCounts.get(n)||0, '']);
+  });
+
+  rows.push([],[' === SUMMARY ===']);
+  rows.push(['Total PLs', S.PLs.length]);
+  rows.push(['Scanned',   S.scanned.size]);
+  rows.push(['Missing',   S.PLs.length - S.scanned.size]);
+  rows.push(['Unmatched', S.unmatched.length]);
+  rows.push(['Total Scans', S.scanHistory.length]);
+  rows.push(['Generated',  new Date().toLocaleString()]);
+
+  if (S.unmatched.length) {
+    rows.push([],[' === UNMATCHED ENTRIES ==='],['Code','Reason','Time']);
+    S.unmatched.forEach(u => rows.push([u.code, u.reason, u.time]));
+  }
+
+  if (S.scanHistory.length) {
+    rows.push([],[' === SCAN HISTORY ==='],['#','Code','Source','Time']);
+    S.scanHistory.forEach((h,i) => rows.push([i+1, h.code, h.source, h.time]));
+  }
+
+  const csv  = rows.map(r => r.map(q).join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `PL-Report-${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  setStatus(el.scanStatus, '✅ CSV report downloaded', 'success');
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    el.confirmModal.classList.add('hidden');
+    el.manualModal.classList.add('hidden');
+  }
+  if ((e.ctrlKey||e.metaKey) && e.key === '/') { e.preventDefault(); el.searchInput.focus(); }
+  if ((e.ctrlKey||e.metaKey) && e.key === 'b') { e.preventDefault(); el.barcodeInput.focus(); }
+});
+
+// Offline indicator
+const checkOnline = () => {
+  el.offlineBadge.classList.toggle('visible', !navigator.onLine);
+};
+window.addEventListener('online',  checkOnline);
+window.addEventListener('offline', checkOnline);
+checkOnline();
+
+// Init
+updateSummary();
+el.barcodeInput.focus();
 </script>
 </body>
 </html>
